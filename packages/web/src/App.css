@@ -1,38 +1,145 @@
-.App {
-  text-align: center;
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", sans-serif;
+  background-color: #f8f9fa;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+.app-container {
+  padding: 20px;
+  background-color: #f8f9fa;
   min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background-color: #ff9f1c;
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.app-header h1 {
+  font-size: 1.8em;
+  font-weight: 600;
+  margin: 0;
+}
+
+.clock {
+  font-size: 1.8em;
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.dish-column {
+  background-color: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dish-column h2 {
+  font-size: 1.5em;
+  color: #ff9f1c;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.dish-list {
   display: flex;
   flex-direction: column;
+  gap: 15px;
+}
+
+.dish-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 15px;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.dish-card:last-child {
+  border-bottom: none;
+}
+
+.dish-info,
+.dish-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dish-action {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dish-card p {
+  margin: 2px 0;
+  font-size: 1em;
+}
+
+.dish-notes {
+  font-style: italic;
+  color: #e74c3c;
+  font-size: 0.9em;
+}
+
+.time-waiting {
+  color: #ff9f1c;
+  font-weight: bold;
+}
+
+.time-prepared {
+  color: #555;
+  font-weight: normal;
+}
+
+.done-button {
+  background-color: #4caf50;
+  border: none;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  font-size: 16px;
+  margin-left: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
 }
 
-.App-link {
-  color: #61dafb;
+.done-button:hover {
+  background-color: #45a049;
+  transform: scale(1.1);
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.empty-list-message {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+  font-style: italic;
 }

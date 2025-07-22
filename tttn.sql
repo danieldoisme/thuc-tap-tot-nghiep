@@ -1,0 +1,63 @@
+CREATE DATABASE IF NOT EXISTS tttn;
+
+USE tttn;
+
+DROP TABLE IF EXISTS Users;
+CREATE TABLE Users (
+    UserID INT PRIMARY KEY AUTO_INCREMENT,
+    UserCode VARCHAR(50) UNIQUE NOT NULL,
+    Password VARCHAR(255) NOT NULL,
+    FullName VARCHAR(100)
+);
+
+DROP TABLE IF EXISTS Tables;
+CREATE TABLE Tables (
+    TableID INT PRIMARY KEY AUTO_INCREMENT,
+    TableName VARCHAR(50) NOT NULL,
+    Status VARCHAR(20) DEFAULT 'trống'
+);
+
+DROP TABLE IF EXISTS Categories;
+CREATE TABLE Categories (
+    CategoryID INT PRIMARY KEY AUTO_INCREMENT,
+    CategoryName VARCHAR(100) NOT NULL
+);
+
+DROP TABLE IF EXISTS Dishes;
+CREATE TABLE Dishes (
+    DishID INT PRIMARY KEY AUTO_INCREMENT,
+    DishName VARCHAR(150) NOT NULL,
+    Price DECIMAL(10, 0) NOT NULL,
+    ImageURL VARCHAR(255),
+    CategoryID INT,
+    FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
+);
+
+DROP TABLE IF EXISTS Orders;
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY AUTO_INCREMENT,
+    TableID INT,
+    UserID INT,
+    OrderTime DATETIME DEFAULT CURRENT_TIMESTAMP,
+    SubTotal DECIMAL(12, 0) NOT NULL,
+    VAT_Percentage DECIMAL(4, 2) DEFAULT 8.0,
+    VAT_Amount DECIMAL(12, 0) NOT NULL,
+    TotalAmount DECIMAL(12, 0) NOT NULL,
+    Status VARCHAR(20) DEFAULT 'chờ thanh toán',
+    FOREIGN KEY (TableID) REFERENCES Tables(TableID),
+    FOREIGN KEY (UserID) REFERENCES Users(UserID)
+);
+
+
+DROP TABLE IF EXISTS Order_Items;
+CREATE TABLE Order_Items (
+    OrderItemID INT PRIMARY KEY AUTO_INCREMENT,
+    OrderID INT,
+    DishID INT,
+    Quantity INT NOT NULL,
+    Price DECIMAL(10, 0) NOT NULL,
+    Notes VARCHAR(255),
+    Status VARCHAR(20) DEFAULT 'chờ chế biến',
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+    FOREIGN KEY (DishID) REFERENCES Dishes(DishID)
+);
