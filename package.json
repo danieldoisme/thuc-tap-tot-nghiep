@@ -1,0 +1,24 @@
+{
+  "name": "thuc-tap-tot-nghiep",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/danieldoisme/thuc-tap-tot-nghiep#readme",
+  "bugs": {
+    "url": "https://github.com/danieldoisme/thuc-tap-tot-nghiep/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danieldoisme/thuc-tap-tot-nghiep.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.9.0",
+    "mysql2": "^3.14.2"
+  }
+}
