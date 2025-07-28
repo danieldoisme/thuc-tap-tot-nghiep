@@ -111,6 +111,33 @@ app.get("/api/tables", async (req, res) => {
   }
 });
 
+// --- 3. API LẤY THỰC ĐƠN (MENU) ---
+app.get("/api/menu", async (req, res) => {
+  try {
+    const [categories] = await pool.query(
+      "SELECT * FROM Categories ORDER BY CategoryName"
+    );
+
+    const [dishes] = await pool.query(
+      "SELECT DishID, DishName, Price, ImageURL, CategoryID FROM Dishes"
+    );
+
+    const menu = categories.map((category) => {
+      return {
+        ...category,
+        dishes: dishes.filter(
+          (dish) => dish.CategoryID === category.CategoryID
+        ),
+      };
+    });
+
+    res.json(menu);
+  } catch (error) {
+    console.error("Lỗi khi lấy thực đơn:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  }
+});
+
 // ===============================================
 // APIs DÀNH CHO ỨNG DỤNG WEB
 // ===============================================
