@@ -138,6 +138,71 @@ app.get("/api/menu", async (req, res) => {
   }
 });
 
+// --- 4. API TẠO ĐƠN HÀNG MỚI ---
+app.post("/api/orders", async (req, res) => {
+  const { tableId, userId, items } = req.body;
+
+  if (!tableId || !userId || !items || items.length === 0) {
+    return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Tính toán tổng tiền
+    const subTotal = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    const vatAmount = subTotal * 0.08; // Giả sử VAT 8%
+    const totalAmount = subTotal + vatAmount;
+
+    // Tạo một bản ghi mới trong bảng `Orders`
+    const [orderResult] = await connection.execute(
+      "INSERT INTO Orders (TableID, UserID, SubTotal, VAT_Amount, TotalAmount, OrderDate) VALUES (?, ?, ?, ?, ?, NOW())",
+      [tableId, userId, subTotal, vatAmount, totalAmount]
+    );
+    const orderId = orderResult.insertId;
+
+    // Chuẩn bị dữ liệu và thêm các món ăn vào bảng `Order_Items`
+    const orderItemsValues = items.map((item) => [
+      orderId,
+      item.id,
+      item.quantity,
+      item.price,
+      item.notes || null,
+    ]);
+    await connection.query(
+      "INSERT INTO Order_Items (OrderID, DishID, Quantity, Price, Notes) VALUES ?",
+      [orderItemsValues]
+    );
+
+    // Cập nhật trạng thái của bàn thành 'có khách'
+    await connection.execute(
+      "UPDATE Tables SET Status = 'có khách' WHERE TableID = ?",
+      [tableId]
+    );
+
+    // Nếu tất cả thành công, commit transaction
+    await connection.commit();
+
+    // Gửi thông báo đến nhà bếp qua Socket.IO
+    io.emit("new_order");
+
+    res
+      .status(201)
+      .json({ message: "Tạo đơn hàng thành công!", orderId: orderId });
+  } catch (error) {
+    // Nếu có lỗi, rollback tất cả thay đổi
+    await connection.rollback();
+    console.error("Lỗi khi tạo đơn hàng:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  } finally {
+    connection.release();
+  }
+});
+
 // ===============================================
 // APIs DÀNH CHO ỨNG DỤNG WEB
 // ===============================================
