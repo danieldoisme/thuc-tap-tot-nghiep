@@ -1,65 +1,87 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import io from "socket.io-client";
 import "./App.css";
 
-const initialWaitingDishes = [
-  {
-    orderItemId: 1,
-    dishName: "Phở Bò Tái",
-    quantity: 2,
-    tableName: "Bàn 2",
-    orderTime: "2025-07-22T11:55:55Z",
-    notes: "Không hành",
-  },
-  {
-    orderItemId: 2,
-    dishName: "Bún Chả",
-    quantity: 2,
-    tableName: "Bàn 1",
-    orderTime: "2025-07-22T11:55:55Z",
-    notes: null,
-  },
-  {
-    orderItemId: 3,
-    dishName: "Cơm Tấm",
-    quantity: 2,
-    tableName: "Bàn 3",
-    orderTime: "2025-07-22T11:55:55Z",
-    notes: "Thêm trứng ốp la",
-  },
-  {
-    orderItemId: 4,
-    dishName: "Gỏi Cuốn",
-    quantity: 4,
-    tableName: "Bàn 5",
-    orderTime: "2025-07-22T11:55:55Z",
-    notes: null,
-  },
-];
+const API_URL = "http://localhost:3001";
+const socket = io(API_URL);
 
 const App = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [waitingDishes, setWaitingDishes] = useState(initialWaitingDishes);
+  const [waitingDishes, setWaitingDishes] = useState([]);
   const [preparedDishes, setPreparedDishes] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+
+  const fetchAndSetDishes = useCallback(async (page, date) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/kitchen-orders?page=${page}&limit=10&date=${date}`
+      );
+      const { orders, totalPages: newTotalPages } = response.data;
+
+      const formattedDishes = orders.map((dish) => ({
+        orderItemId: dish.OrderItemID,
+        dishName: dish.DishName,
+        quantity: dish.Quantity,
+        tableName: dish.TableName,
+        orderTime: dish.OrderTime,
+        status: dish.Status,
+        notes: dish.Notes,
+      }));
+
+      const waiting = formattedDishes.filter(
+        (dish) => dish.status === "đang chế biến"
+      );
+      const prepared = formattedDishes
+        .filter((dish) => dish.status === "đã hoàn thành")
+        .map((dish) => ({
+          ...dish,
+          time: new Date(dish.orderTime).toLocaleTimeString("en-GB"),
+        }));
+
+      setWaitingDishes(waiting);
+      setPreparedDishes(prepared);
+      setTotalPages(newTotalPages);
+    } catch (error) {
+      console.error("Lỗi không thể tải dữ liệu:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-    return () => clearInterval(timer);
+
+    return () => {
+      clearInterval(timer);
+    };
   }, []);
 
-  const handleMarkAsDone = (orderItemId) => {
-    const dishToMove = waitingDishes.find(
-      (dish) => dish.orderItemId === orderItemId
-    );
-    if (dishToMove) {
-      const now = new Date();
-      const doneDish = { ...dishToMove, time: now.toLocaleTimeString("en-GB") };
+  useEffect(() => {
+    fetchAndSetDishes(currentPage, selectedDate);
 
-      setWaitingDishes(
-        waitingDishes.filter((dish) => dish.orderItemId !== orderItemId)
-      );
-      setPreparedDishes((prevPrepared) => [doneDish, ...prevPrepared]);
+    const handleStatusUpdate = () => {
+      // Tải lại dữ liệu trang hiện tại khi có cập nhật
+      fetchAndSetDishes(currentPage, selectedDate);
+    };
+
+    socket.on("order_status_updated", handleStatusUpdate);
+
+    return () => {
+      socket.off("order_status_updated", handleStatusUpdate);
+    };
+  }, [currentPage, selectedDate, fetchAndSetDishes]);
+
+  const handleMarkAsDone = async (orderItemId) => {
+    try {
+      await axios.patch(`${API_URL}/api/order-items/${orderItemId}/complete`);
+    } catch (error) {
+      console.error("Lỗi khi cập nhật trạng thái:", error);
+      alert("Không thể cập nhật trạng thái món ăn.");
     }
   };
 
@@ -80,9 +102,7 @@ const App = () => {
         <p>{dish.tableName}</p>
         <p className={isWaiting ? "time-waiting" : "time-prepared"}>
           {isWaiting
-            ? new Date(dish.orderTime).toLocaleTimeString("en-GB", {
-                timeZone: "UTC",
-              })
+            ? new Date(dish.orderTime).toLocaleTimeString("en-GB")
             : dish.time}
         </p>
       </div>
@@ -111,11 +131,32 @@ const App = () => {
     </div>
   );
 
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const handleDateChange = (event) => {
+    setSelectedDate(event.target.value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="app-container">
       <header className="app-header">
         <h1>Danh sách món ăn chờ chế biến</h1>
-        <div className="clock">{formatTime(currentTime)}</div>
+        <div className="header-controls">
+          <div className="date-picker-container">
+            <input
+              type="date"
+              id="date-picker"
+              value={selectedDate}
+              onChange={handleDateChange}
+            />
+          </div>
+          <div className="clock">{formatTime(currentTime)}</div>
+        </div>
       </header>
       <main className="main-content">
         <div className="dish-column">
@@ -123,7 +164,7 @@ const App = () => {
           <div className="dish-list">
             {waitingDishes.length > 0 ? (
               waitingDishes
-                .sort((a, b) => a.orderTime.localeCompare(b.orderTime))
+                .sort((a, b) => new Date(a.orderTime) - new Date(b.orderTime))
                 .map((dish) => (
                   <DishCard
                     key={dish.orderItemId}
@@ -156,6 +197,25 @@ const App = () => {
           </div>
         </div>
       </main>
+      <footer className="app-footer">
+        <div className="pagination">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Trang trước
+          </button>
+          <span>
+            Trang {currentPage} / {totalPages}
+          </span>
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Trang sau
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };

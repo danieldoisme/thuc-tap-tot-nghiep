@@ -27,6 +27,23 @@ body {
   font-size: 1.8em;
   font-weight: 600;
   margin: 0;
+  flex-shrink: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.date-picker-container input[type="date"] {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 1em;
+  color: #333;
+  cursor: pointer;
 }
 
 .clock {
@@ -142,4 +159,48 @@ body {
   color: #888;
   padding: 20px;
   font-style: italic;
+}
+
+.app-footer {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pagination span {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ff9f1c;
+  background-color: #ff9f1c;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background-color: #ff9500;
+  border-color: #ff9500;
+}
+
+.pagination button:disabled {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.65;
 }
