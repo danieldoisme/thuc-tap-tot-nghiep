@@ -3,6 +3,7 @@
 
 # Environment variables
 .env
+.vscode/
 
 # macOS specific
 .DS_Store
