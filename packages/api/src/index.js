@@ -37,7 +37,83 @@ io.on("connection", (socket) => {
   });
 });
 
-// --- API Endpoints ---
+// ===============================================
+// APIs DÀNH CHO ỨNG DỤNG DI ĐỘNG
+// ===============================================
+
+// --- 1. API ĐĂNG NHẬP ---
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+
+const JWT_SECRET = process.env.JWT_SECRET || "jwt_secret_key";
+
+app.post("/api/login", async (req, res) => {
+  const { userCode, password } = req.body;
+
+  if (!userCode || !password) {
+    return res
+      .status(400)
+      .json({ message: "Vui lòng nhập mã nhân viên và mật khẩu." });
+  }
+
+  try {
+    const [users] = await pool.query(
+      "SELECT UserID, UserCode, Password, FullName FROM Users WHERE UserCode = ?",
+      [userCode]
+    );
+
+    if (users.length === 0) {
+      return res
+        .status(401)
+        .json({ message: "Mã nhân viên hoặc mật khẩu không đúng." });
+    }
+
+    const user = users[0];
+    const isPasswordMatch = await bcrypt.compare(password, user.Password);
+
+    if (!isPasswordMatch) {
+      return res
+        .status(401)
+        .json({ message: "Mã nhân viên hoặc mật khẩu không đúng." });
+    }
+
+    const token = jwt.sign(
+      { userId: user.UserID, userCode: user.UserCode },
+      JWT_SECRET,
+      { expiresIn: "8h" }
+    );
+
+    res.json({
+      message: "Đăng nhập thành công!",
+      token,
+      user: {
+        userId: user.UserID,
+        fullName: user.FullName,
+        userCode: user.UserCode,
+      },
+    });
+  } catch (error) {
+    console.error("Lỗi khi đăng nhập:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  }
+});
+
+// --- 2. API LẤY DANH SÁCH BÀN ĂN ---
+app.get("/api/tables", async (req, res) => {
+  try {
+    const [tables] = await pool.query(
+      "SELECT TableID, TableName, Status FROM Tables ORDER BY TableName"
+    );
+    res.json(tables);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách bàn:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  }
+});
+
+// ===============================================
+// APIs DÀNH CHO ỨNG DỤNG WEB
+// ===============================================
 
 // API LẤY DANH SÁCH MÓN ĂN CHỜ CHẾ BIẾN
 app.get("/api/kitchen-orders", async (req, res) => {
