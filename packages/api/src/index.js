@@ -237,6 +237,39 @@ app.get("/api/orders/table/:tableId", async (req, res) => {
   }
 });
 
+// --- 6. API CẬP NHẬT TRẠNG THÁI MÓN ĂN -> "đã phục vụ" ---
+app.patch("/api/order-items/:orderItemId/serve", async (req, res) => {
+  try {
+    const { orderItemId } = req.params;
+
+    const [result] = await pool.execute(
+      "UPDATE Order_Items SET Status = 'đã phục vụ' WHERE OrderItemID = ?",
+      [orderItemId]
+    );
+
+    // Kiểm tra xem có dòng nào được cập nhật không
+    if (result.affectedRows === 0) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy món ăn để cập nhật." });
+    }
+
+    // Gửi sự kiện để các client khác có thể cập nhật UI
+    io.emit("item_status_updated", {
+      orderItemId: orderItemId,
+      status: "đã phục vụ",
+    });
+
+    res.json({ message: "Cập nhật trạng thái thành công." });
+  } catch (error) {
+    console.error(
+      `Lỗi khi cập nhật trạng thái cho món ăn ${req.params.orderItemId}:`,
+      error
+    );
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  }
+});
+
 // ===============================================
 // APIs DÀNH CHO ỨNG DỤNG WEB
 // ===============================================
