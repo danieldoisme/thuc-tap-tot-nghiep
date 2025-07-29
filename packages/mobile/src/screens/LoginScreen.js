@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,30 +6,84 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import axios from 'axios';
+import { API_BASE_URL } from '../apiConfig';
 
 const LoginScreen = ({ navigation }) => {
+  const [userCode, setUserCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!userCode || !password) {
+      Alert.alert(
+        'Thông báo',
+        'Vui lòng nhập đầy đủ mã nhân viên và mật khẩu.',
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/login`, {
+        userCode,
+        password,
+      });
+
+      const userData = response.data.user;
+
+      if (userData) {
+        navigation.replace('TableList', { user: userData });
+      } else {
+        Alert.alert(
+          'Đăng nhập thất bại',
+          'Không nhận được thông tin người dùng từ server.',
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Lỗi đăng nhập:',
+        error.response?.data?.message || error.message,
+      );
+      Alert.alert(
+        'Đăng nhập thất bại',
+        'Mã nhân viên hoặc mật khẩu không đúng.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
       <Text style={styles.title}>Đăng nhập</Text>
       <TextInput
         style={styles.input}
         placeholder="Mã nhân viên"
-        placeholderTextColor="#c7c7c7"
+        value={userCode}
+        onChangeText={setUserCode}
+        autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
         placeholder="Mật khẩu"
-        placeholderTextColor="#c7c7c7"
+        value={password}
+        onChangeText={setPassword}
         secureTextEntry
       />
       <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.replace('TableList')}
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
       >
-        <Text style={styles.buttonText}>Đăng nhập</Text>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Đăng nhập</Text>
+        )}
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -38,39 +92,36 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#FF9F1C',
+    textAlign: 'center',
     marginBottom: 40,
   },
   input: {
-    width: '100%',
-    backgroundColor: '#FFF8E1',
-    borderRadius: 25,
     height: 50,
-    marginBottom: 20,
-    justifyContent: 'center',
-    padding: 20,
-    fontSize: 16,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 15,
   },
   button: {
-    width: '100%',
-    backgroundColor: '#FF9F1C',
-    borderRadius: 25,
-    height: 50,
+    backgroundColor: '#007BFF',
+    padding: 15,
+    borderRadius: 5,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
+  },
+  buttonDisabled: {
+    backgroundColor: '#A9A9A9',
   },
   buttonText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });

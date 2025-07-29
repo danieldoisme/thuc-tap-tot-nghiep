@@ -98,7 +98,6 @@ const TableDetailsScreen = ({ route, navigation }) => {
     </View>
   );
 
-  // Giao diện khi đang tải
   if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
