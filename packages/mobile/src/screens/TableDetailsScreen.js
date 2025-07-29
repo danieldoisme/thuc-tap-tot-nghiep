@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
+import { useFocusEffect } from '@react-navigation/native';
 
 const TableDetailsScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
@@ -18,43 +19,38 @@ const TableDetailsScreen = ({ route, navigation }) => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(
-          `${API_BASE_URL}/api/orders/table/${tableId}`,
-        );
-
-        const { order: orderInfo, items: orderItems } = response.data;
-        if (orderInfo) {
-          const formattedItems = orderItems.map(item => ({
-            id: item.OrderItemID,
-            name: item.DishName,
-            quantity: item.Quantity,
-            price: parseInt(item.Price),
-            status: item.Status,
-          }));
-          setOrder({ ...orderInfo, items: formattedItems });
-        } else {
-          setOrder(null);
-        }
-      } catch (error) {
-        console.error(`Lỗi khi tải chi tiết bàn ${tableId}:`, error);
-        Alert.alert('Lỗi', 'Không thể tải dữ liệu của bàn.');
-      } finally {
-        setLoading(false);
+  const fetchOrderDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/orders/table/${tableId}`,
+      );
+      const { order: orderInfo, items: orderItems } = response.data;
+      if (orderInfo) {
+        const formattedItems = orderItems.map(item => ({
+          id: item.OrderItemID,
+          name: item.DishName,
+          quantity: item.Quantity,
+          price: parseInt(item.Price),
+          status: item.Status,
+        }));
+        setOrder({ ...orderInfo, items: formattedItems });
+      } else {
+        setOrder(null);
       }
-    };
+    } catch (error) {
+      console.error(`Lỗi khi tải chi tiết bàn ${tableId}:`, error);
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu của bàn.');
+    } finally {
+      setLoading(false);
+    }
+  }, [tableId]);
 
-    // Thêm listener để tự động tải lại dữ liệu khi người dùng quay lại màn hình này
-    const unsubscribe = navigation.addListener('focus', () => {
+  useFocusEffect(
+    useCallback(() => {
       fetchOrderDetails();
-    });
-
-    // Cleanup listener khi màn hình bị unmount
-    return unsubscribe;
-  }, [navigation, tableId]);
+    }, [fetchOrderDetails]),
+  );
 
   const handleCheckout = async () => {
     if (!order) {
@@ -86,14 +82,34 @@ const TableDetailsScreen = ({ route, navigation }) => {
     );
   };
 
+  const handleMarkAsServed = async orderItemId => {
+    try {
+      await axios.patch(`${API_BASE_URL}/api/order-items/${orderItemId}/serve`);
+      fetchOrderDetails();
+    } catch (error) {
+      console.error(`Lỗi khi cập nhật món ăn ${orderItemId}:`, error);
+      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái món ăn.');
+    }
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
-      <Text style={styles.itemName}>
-        {item.name} (x{item.quantity})
-      </Text>
-      <View style={styles.itemDetails}>
-        <Text style={styles.itemStatus}>{item.status}</Text>
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemName}>
+          {item.name} (x{item.quantity})
+        </Text>
+        <Text style={styles.itemStatus}>Trạng thái: {item.status}</Text>
+      </View>
+      <View style={styles.itemActions}>
         <Text style={styles.itemPrice}>{item.price * item.quantity} VND</Text>
+        {item.status === 'đã hoàn thành' && (
+          <TouchableOpacity
+            style={styles.serveButton}
+            onPress={() => handleMarkAsServed(item.id)}
+          >
+            <Text style={styles.serveButtonText}>Phục vụ</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -116,6 +132,7 @@ const TableDetailsScreen = ({ route, navigation }) => {
           renderItem={renderItem}
           keyExtractor={item => item.id.toString()}
           style={styles.list}
+          refreshing={loading}
         />
       ) : (
         <View style={styles.emptyContainer}>
@@ -135,11 +152,7 @@ const TableDetailsScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.orderButton}
           onPress={() =>
-            navigation.navigate('Menu', {
-              tableId: tableId,
-              tableName: tableName,
-              user: user,
-            })
+            navigation.navigate('Menu', { tableId, tableName, user })
           }
         >
           <Text style={styles.buttonText}>Đặt món</Text>
@@ -182,6 +195,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  itemInfo: {
+    flex: 1,
+  },
   itemName: {
     fontSize: 16,
   },
@@ -191,9 +207,25 @@ const styles = StyleSheet.create({
   itemStatus: {
     fontSize: 14,
     color: '#888',
+    fontStyle: 'italic',
+  },
+  itemActions: {
+    alignItems: 'flex-end',
   },
   itemPrice: {
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  serveButton: {
+    backgroundColor: '#ffc107',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    marginTop: 8,
+  },
+  serveButtonText: {
+    color: '#000',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   footer: {
