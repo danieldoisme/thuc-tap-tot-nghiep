@@ -10,8 +10,6 @@ const dbConfig = {
 
 const NUMBER_OF_ORDERS = 500;
 const VAT_PERCENTAGE = 8.0;
-const ORDER_STATUSES = ["chờ thanh toán", "đã thanh toán"];
-const ORDER_ITEM_STATUSES = ["đang chế biến", "đã hoàn thành", "đã phục vụ"];
 const BUSINESS_HOURS = [10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22];
 
 async function createRandomOrder(connection, users, tables, dishes) {
@@ -19,10 +17,9 @@ async function createRandomOrder(connection, users, tables, dishes) {
   try {
     const randomUser = faker.helpers.arrayElement(users);
     const randomTable = faker.helpers.arrayElement(tables);
-    const orderStatus = faker.helpers.arrayElement(ORDER_STATUSES);
+    const orderStatus = "đã thanh toán";
     let orderTime = faker.date.recent({
-      days: 90,
-      refDate: "2025-07-16T00:00:00.000Z",
+      days: 14,
     });
 
     if (Math.random() > 0.3) {
@@ -42,7 +39,7 @@ async function createRandomOrder(connection, users, tables, dishes) {
         DishID: randomDish.DishID,
         Quantity: quantity,
         Price: randomDish.Price,
-        Status: faker.helpers.arrayElement(ORDER_ITEM_STATUSES),
+        Status: "đã phục vụ",
       });
     }
 
