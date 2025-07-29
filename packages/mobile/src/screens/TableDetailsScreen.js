@@ -62,6 +62,19 @@ const TableDetailsScreen = ({ route, navigation }) => {
           notes: item.Notes,
           imageUrl: item.ImageURL ? `${API_BASE_URL}/${item.ImageURL}` : null,
         }));
+
+        const statusPriority = {
+          'đã hoàn thành': 1,
+          'đang chế biến': 2,
+          'đã phục vụ': 3,
+        };
+
+        formattedItems.sort((a, b) => {
+          const priorityA = statusPriority[a.status] || 99;
+          const priorityB = statusPriority[b.status] || 99;
+          return priorityA - priorityB;
+        });
+
         setOrder({ ...orderInfo, items: formattedItems });
       } else {
         setOrder(null);

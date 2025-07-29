@@ -246,6 +246,14 @@ app.get("/api/orders/table/:tableId", async (req, res) => {
       FROM Order_Items oi
       JOIN Dishes d ON oi.DishID = d.DishID
       WHERE oi.OrderID = ?
+      ORDER BY
+        CASE
+          WHEN oi.Status = 'đã hoàn thành' THEN 1
+          WHEN oi.Status = 'đang chế biến' THEN 2
+          WHEN oi.Status = 'đã phục vụ' THEN 3
+          ELSE 4
+        END,
+        oi.OrderItemID ASC
     `,
       [currentOrder.OrderID]
     );
