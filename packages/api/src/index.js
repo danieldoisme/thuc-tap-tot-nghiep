@@ -200,7 +200,7 @@ app.get("/api/orders/table/:tableId", async (req, res) => {
 
     // Tìm đơn hàng chưa thanh toán của bàn
     const [orders] = await pool.query(
-      "SELECT OrderID, TotalAmount, OrderTime FROM Orders WHERE TableID = ? AND Status = 'chờ thanh toán' ORDER BY OrderID DESC LIMIT 1",
+      "SELECT OrderID, SubTotal, VAT_Amount, TotalAmount, OrderTime FROM Orders WHERE TableID = ? AND Status = 'chờ thanh toán' ORDER BY OrderID DESC LIMIT 1",
       [tableId]
     );
 
