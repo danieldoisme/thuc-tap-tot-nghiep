@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  SafeAreaView,
+  FlatList,
   ActivityIndicator,
   Alert,
   Image,
@@ -14,12 +14,20 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '@react-native-vector-icons/ionicons';
+import { useCart } from '../context/CartContext';
 
 const TableDetailsScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
+  const { clearCart } = useCart();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearCart();
+    }, [clearCart]),
+  );
 
   useEffect(() => {
     navigation.setOptions({
@@ -175,7 +183,11 @@ const TableDetailsScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() =>
-            navigation.navigate('Menu', { tableId, tableName, user })
+            navigation.navigate('Menu', {
+              tableId,
+              tableName,
+              user,
+            })
           }
         >
           <Text style={styles.buttonText}>Thêm món</Text>

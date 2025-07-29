@@ -1,77 +1,146 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Animated,
+} from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import Icon from '@react-native-vector-icons/ionicons';
 
-const CartItem = ({ item, onRemove }) => {
-  const formatCurrency = amount => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
+const CartItem = ({ item, onIncrease, onDecrease, onRemove }) => {
+  const renderRightActions = (progress, dragX) => {
+    const trans = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [0, 80],
+      extrapolate: 'clamp',
+    });
+    return (
+      <TouchableOpacity
+        onPress={() => onRemove(item.id)}
+        style={styles.deleteBox}
+      >
+        <Animated.View style={{ transform: [{ translateX: trans }] }}>
+          <Icon name="trash-outline" size={30} color="#fff" />
+        </Animated.View>
+      </TouchableOpacity>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>
-          {item.name} (x{item.quantity})
-        </Text>
-        <Text style={styles.notes}>{item.notes || 'Không có ghi chú'}</Text>
+    <Swipeable renderRightActions={renderRightActions}>
+      <View style={styles.container}>
+        <Image
+          source={
+            item.image
+              ? { uri: item.image }
+              : require('../assets/default-dish.png')
+          }
+          style={styles.image}
+        />
+        <View style={styles.infoContainer}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.price}>
+            {item.price.toLocaleString('vi-VN')} VNĐ
+          </Text>
+          {item.notes ? (
+            <Text style={styles.notes} numberOfLines={1}>
+              Ghi chú: {item.notes}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.quantitySelector}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => onDecrease(item.id)}
+          >
+            <Icon name="remove" size={20} color="#F9790E" />
+          </TouchableOpacity>
+          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => onIncrease(item.id)}
+          >
+            <Icon name="add" size={20} color="#F9790E" />
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.actionsContainer}>
-        <Text style={styles.price}>
-          {formatCurrency(item.price * item.quantity)}
-        </Text>
-        <TouchableOpacity
-          onPress={() => onRemove(item.id)}
-          style={styles.removeButton}
-        >
-          <Text style={styles.removeButtonText}>Xoá</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </Swipeable>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#fff',
     padding: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginHorizontal: 20,
+    marginVertical: 10,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  deleteBox: {
+    backgroundColor: '#ff3b30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginVertical: 10,
+    borderRadius: 15,
+    right: 20,
+  },
+  image: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
   },
   infoContainer: {
-    flex: 3,
+    flex: 1,
+    marginLeft: 15,
+    justifyContent: 'center',
   },
   name: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+  },
+  price: {
+    fontSize: 16,
+    color: '#666',
+    marginVertical: 4,
   },
   notes: {
     fontSize: 14,
-    color: 'gray',
+    color: '#888',
     fontStyle: 'italic',
-    marginTop: 4,
   },
-  actionsContainer: {
-    flex: 2,
+  quantitySelector: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  price: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginRight: 15,
+  quantityButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  removeButton: {
-    padding: 5,
-  },
-  removeButtonText: {
-    color: '#e74c3c',
-    fontSize: 14,
+  quantityText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F9790E',
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#F9790E',
+    borderStyle: 'dashed',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
 });
 

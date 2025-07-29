@@ -2,71 +2,72 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 
 const DishItem = ({ item, onAddToCart }) => {
-  const formatCurrency = amount => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
-  };
-
   return (
-    <View style={styles.container}>
-      <Image source={{ uri: item.image }} style={styles.image} />
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.price}>{formatCurrency(item.price)}</Text>
-      </View>
+    <View style={styles.dishItemContainer}>
+      <Image
+        source={
+          item.image
+            ? { uri: item.image }
+            : require('../assets/default-dish.png')
+        }
+        style={styles.dishImage}
+      />
+      <Text style={styles.dishName} numberOfLines={1}>
+        {item.name}
+      </Text>
+      <Text style={styles.dishPrice}>
+        {item.price.toLocaleString('vi-VN')} VNĐ
+      </Text>
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => onAddToCart(item)}
       >
-        <Text style={styles.addButtonText}>Thêm</Text>
+        <Text style={styles.addButtonText}>Thêm món</Text>
       </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+  dishItemContainer: {
+    flex: 1,
+    margin: 8,
     backgroundColor: '#fff',
     borderRadius: 10,
-    marginVertical: 5,
-    marginHorizontal: 10,
+    padding: 10,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  image: {
-    width: 70,
-    height: 70,
+  dishImage: {
+    width: '100%',
+    height: 120,
     borderRadius: 10,
+    marginBottom: 10,
   },
-  infoContainer: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  name: {
+  dishName: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
   },
-  price: {
+  dishPrice: {
     fontSize: 14,
-    color: '#FF9F1C',
-    marginTop: 5,
+    color: '#666',
+    marginVertical: 5,
   },
   addButton: {
-    backgroundColor: '#FF9F1C',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    backgroundColor: '#F9790E',
     borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginTop: 5,
   },
   addButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
   },

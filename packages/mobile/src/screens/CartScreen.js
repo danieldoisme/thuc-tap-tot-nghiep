@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,31 +7,77 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
+import CartItem from '../components/CartItem';
+import { useCart } from '../context/CartContext';
 
 const CartScreen = ({ route, navigation }) => {
-  // Nhận tất cả dữ liệu đã được truyền tới
-  const { cartItems, tableId, tableName, user } = route.params;
+  const { tableId, tableName, user } = route.params;
+  const { cart: items, setCart, clearCart } = useCart();
 
-  const calculateTotal = () => {
-    if (!cartItems) return 0;
-    return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: tableName,
+      headerStyle: { backgroundColor: '#F9790E' },
+      headerTintColor: '#fff',
+      headerTitleStyle: { fontWeight: 'bold', fontSize: 22 },
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
+    });
+  }, [navigation, tableName]);
+
+  const handleIncrease = itemId => {
+    setCart(currentItems =>
+      currentItems.map(item =>
+        item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item,
+      ),
+    );
   };
 
+  const handleDecrease = itemId => {
+    setCart(currentItems =>
+      currentItems
+        .map(item =>
+          item.id === itemId
+            ? { ...item, quantity: Math.max(1, item.quantity - 1) }
+            : item,
+        )
+        .filter(item => item.quantity > 0),
+    );
+  };
+
+  const handleRemove = itemId => {
+    setCart(currentItems => currentItems.filter(item => item.id !== itemId));
+  };
+
+  const { totalQuantity, totalPrice } = useMemo(() => {
+    return items.reduce(
+      (totals, item) => {
+        totals.totalQuantity += item.quantity;
+        totals.totalPrice += item.price * item.quantity;
+        return totals;
+      },
+      { totalQuantity: 0, totalPrice: 0 },
+    );
+  }, [items]);
+
   const handleConfirmOrder = async () => {
-    if (!cartItems || cartItems.length === 0) {
+    if (items.length === 0) {
       Alert.alert('Lỗi', 'Giỏ hàng trống!');
       return;
     }
-
-    // Chuẩn bị dữ liệu để gửi đi theo đúng định dạng API yêu cầu
+    setIsLoading(true);
     const orderData = {
       tableId: tableId,
       userId: user.userId,
-      items: cartItems.map(item => ({
-        id: item.id,
+      items: items.map(item => ({
+        id: parseInt(item.id, 10),
         quantity: item.quantity,
         price: item.price,
         notes: item.notes,
@@ -43,112 +89,144 @@ const CartScreen = ({ route, navigation }) => {
       Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!', [
         {
           text: 'OK',
-          onPress: () =>
-            navigation.navigate('TableDetails', { tableId, tableName, user }),
+          onPress: () => {
+            clearCart();
+            navigation.navigate('TableDetails', { tableId, tableName, user });
+          },
         },
       ]);
     } catch (error) {
       console.error('Lỗi khi tạo đơn hàng:', error);
       Alert.alert('Lỗi', 'Không thể gửi đơn hàng. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      <Text style={styles.itemName}>
-        {item.name} (x{item.quantity})
-      </Text>
-      <Text style={styles.itemPrice}>{item.price * item.quantity} VND</Text>
-      {item.notes ? (
-        <Text style={styles.itemNotes}>Ghi chú: {item.notes}</Text>
-      ) : null}
-    </View>
+    <CartItem
+      item={item}
+      onIncrease={handleIncrease}
+      onDecrease={handleDecrease}
+      onRemove={handleRemove}
+    />
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Xác nhận Đơn hàng cho {tableName}</Text>
-      <FlatList
-        data={cartItems}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Giỏ hàng của bạn đang trống.</Text>
-        }
-      />
-      <View style={styles.footer}>
-        <Text style={styles.totalText}>Tổng cộng: {calculateTotal()} VND</Text>
-        <TouchableOpacity
-          style={styles.confirmButton}
-          onPress={handleConfirmOrder}
-        >
-          <Text style={styles.buttonText}>Xác nhận</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>Giỏ hàng</Text>
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          contentContainerStyle={{ paddingBottom: 200 }}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Giỏ hàng của bạn đang trống.</Text>
+            </View>
+          }
+        />
+        <View style={styles.summaryContainer}>
+          <Text style={styles.summaryTitle}>Tóm tắt</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tổng số lượng</Text>
+            <Text style={styles.summaryValue}>{totalQuantity}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tổng tiền</Text>
+            <Text style={styles.summaryValue}>
+              {totalPrice.toLocaleString('vi-VN')} VNĐ
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.confirmButton, isLoading && styles.disabledButton]}
+            onPress={handleConfirmOrder}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Gửi bếp</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f8f9fa',
   },
   title: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 'bold',
-    textAlign: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
-  itemContainer: {
-    backgroundColor: '#fff',
-    padding: 15,
-    marginVertical: 5,
-    marginHorizontal: 10,
-    borderRadius: 5,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 100,
   },
-  itemName: {
+  emptyText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    color: '#888',
   },
-  itemPrice: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'right',
-  },
-  itemNotes: {
-    fontSize: 14,
-    color: '#777',
-    fontStyle: 'italic',
-    marginTop: 5,
-  },
-  footer: {
+  summaryContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
     padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    paddingBottom: 30,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
   },
-  totalText: {
+  summaryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'right',
     marginBottom: 15,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   confirmButton: {
-    backgroundColor: '#28a745',
-    padding: 15,
-    borderRadius: 5,
+    backgroundColor: '#F9790E',
+    paddingVertical: 15,
+    borderRadius: 30,
     alignItems: 'center',
+    marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#fabd81',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 50,
-    fontSize: 16,
-    color: '#888',
   },
 });
 
