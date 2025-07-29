@@ -129,7 +129,7 @@ app.get("/api/menu", async (req, res) => {
   }
 });
 
-// --- 4. API TẠO ĐƠN HÀNG MỚI ---
+// --- 4. API TẠO ĐƠN HÀNG MỚI HOẶC THÊM MÓN VÀO ĐƠN HÀNG HIỆN TẠI ---
 app.post("/api/orders", async (req, res) => {
   const { tableId, userId, items } = req.body;
 
@@ -141,22 +141,35 @@ app.post("/api/orders", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Tính toán tổng tiền
-    const subTotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
+    // Kiểm tra xem có đơn hàng nào đang 'chờ thanh toán' cho bàn này không
+    const [existingOrders] = await connection.query(
+      "SELECT OrderID FROM Orders WHERE TableID = ? AND Status = 'chờ thanh toán' ORDER BY OrderID DESC LIMIT 1",
+      [tableId]
     );
-    const vatAmount = subTotal * 0.08; // Giả sử VAT 8%
-    const totalAmount = subTotal + vatAmount;
 
-    // Tạo một bản ghi mới trong bảng `Orders`
-    const [orderResult] = await connection.execute(
-      "INSERT INTO Orders (TableID, UserID, SubTotal, VAT_Amount, TotalAmount, OrderTime) VALUES (?, ?, ?, ?, ?, NOW())",
-      [tableId, userId, subTotal, vatAmount, totalAmount]
-    );
-    const orderId = orderResult.insertId;
+    let orderId;
 
-    // Chuẩn bị dữ liệu và thêm các món ăn vào bảng `Order_Items`
+    if (existingOrders.length > 0) {
+      // Nếu có, sử dụng OrderID hiện có
+      orderId = existingOrders[0].OrderID;
+    } else {
+      // Nếu không, tạo một đơn hàng mới
+      const [orderResult] = await connection.execute(
+        "INSERT INTO Orders (TableID, UserID, SubTotal, VAT_Amount, TotalAmount, OrderTime) VALUES (?, ?, 0, 0, 0, NOW())",
+        [tableId, userId]
+      );
+      orderId = orderResult.insertId;
+
+      // Cập nhật trạng thái bàn thành 'có khách' chỉ khi tạo order mới
+      await connection.execute(
+        "UPDATE Tables SET Status = 'có khách' WHERE TableID = ?",
+        [tableId]
+      );
+      // Gửi sự kiện cập nhật trạng thái bàn
+      io.emit("table_status_updated", { tableId: tableId, status: "có khách" });
+    }
+
+    // Thêm các món ăn mới vào bảng Order_Items
     const orderItemsValues = items.map((item) => [
       orderId,
       item.id,
@@ -169,10 +182,18 @@ app.post("/api/orders", async (req, res) => {
       [orderItemsValues]
     );
 
-    // Cập nhật trạng thái của bàn thành 'có khách'
+    // Cập nhật lại tổng tiền của đơn hàng
+    const [allItems] = await connection.query(
+      "SELECT SUM(Price * Quantity) as total FROM Order_Items WHERE OrderID = ?",
+      [orderId]
+    );
+    const subTotal = allItems[0].total || 0;
+    const vatAmount = subTotal * 0.08;
+    const totalAmount = subTotal + vatAmount;
+
     await connection.execute(
-      "UPDATE Tables SET Status = 'có khách' WHERE TableID = ?",
-      [tableId]
+      "UPDATE Orders SET SubTotal = ?, VAT_Amount = ?, TotalAmount = ? WHERE OrderID = ?",
+      [subTotal, vatAmount, totalAmount, orderId]
     );
 
     // Nếu tất cả thành công, commit transaction
@@ -181,16 +202,12 @@ app.post("/api/orders", async (req, res) => {
     // Gửi thông báo đến nhà bếp
     io.emit("new_order");
 
-    // Gửi sự kiện cập nhật trạng thái bàn
-    io.emit("table_status_updated", { tableId: tableId, status: "có khách" });
-
     res
       .status(201)
-      .json({ message: "Tạo đơn hàng thành công!", orderId: orderId });
+      .json({ message: "Cập nhật đơn hàng thành công!", orderId: orderId });
   } catch (error) {
-    // Nếu có lỗi, rollback tất cả thay đổi
     await connection.rollback();
-    console.error("Lỗi khi tạo đơn hàng:", error);
+    console.error("Lỗi khi xử lý đơn hàng:", error);
     res.status(500).json({ message: "Lỗi từ phía server." });
   } finally {
     connection.release();
@@ -222,8 +239,10 @@ app.get("/api/orders/table/:tableId", async (req, res) => {
         oi.OrderItemID, 
         oi.Quantity, 
         oi.Status, 
+        oi.Notes,
         d.DishName, 
-        d.Price
+        d.Price,
+        d.ImageURL
       FROM Order_Items oi
       JOIN Dishes d ON oi.DishID = d.DishID
       WHERE oi.OrderID = ?
