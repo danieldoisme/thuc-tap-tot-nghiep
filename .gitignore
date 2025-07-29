@@ -5,6 +5,7 @@
 # Environment variables
 .env
 .vscode/
+apiConfig.js
 
 # macOS specific
 .DS_Store
