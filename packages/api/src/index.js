@@ -42,10 +42,7 @@ io.on("connection", (socket) => {
 // ===============================================
 
 // --- 1. API ĐĂNG NHẬP ---
-import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-
-const JWT_SECRET = process.env.JWT_SECRET || "jwt_secret_key";
 
 app.post("/api/login", async (req, res) => {
   const { userCode, password } = req.body;
@@ -77,15 +74,8 @@ app.post("/api/login", async (req, res) => {
         .json({ message: "Mã nhân viên hoặc mật khẩu không đúng." });
     }
 
-    const token = jwt.sign(
-      { userId: user.UserID, userCode: user.UserCode },
-      JWT_SECRET,
-      { expiresIn: "8h" }
-    );
-
     res.json({
       message: "Đăng nhập thành công!",
-      token,
       user: {
         userId: user.UserID,
         fullName: user.FullName,
@@ -160,7 +150,7 @@ app.post("/api/orders", async (req, res) => {
 
     // Tạo một bản ghi mới trong bảng `Orders`
     const [orderResult] = await connection.execute(
-      "INSERT INTO Orders (TableID, UserID, SubTotal, VAT_Amount, TotalAmount, OrderDate) VALUES (?, ?, ?, ?, ?, NOW())",
+      "INSERT INTO Orders (TableID, UserID, SubTotal, VAT_Amount, TotalAmount, OrderTime) VALUES (?, ?, ?, ?, ?, NOW())",
       [tableId, userId, subTotal, vatAmount, totalAmount]
     );
     const orderId = orderResult.insertId;
@@ -200,6 +190,50 @@ app.post("/api/orders", async (req, res) => {
     res.status(500).json({ message: "Lỗi từ phía server." });
   } finally {
     connection.release();
+  }
+});
+
+// --- 5. API LẤY CHI TIẾT ĐƠN HÀNG CỦA MỘT BÀN ---
+app.get("/api/orders/table/:tableId", async (req, res) => {
+  try {
+    const { tableId } = req.params;
+
+    // Tìm đơn hàng chưa thanh toán của bàn
+    const [orders] = await pool.query(
+      "SELECT OrderID, TotalAmount, OrderTime FROM Orders WHERE TableID = ? AND Status = 'chờ thanh toán' ORDER BY OrderID DESC LIMIT 1",
+      [tableId]
+    );
+
+    if (orders.length === 0) {
+      // Nếu bàn không có order, trả về mảng rỗng
+      return res.json({ order: null, items: [] });
+    }
+
+    const currentOrder = orders[0];
+
+    // Lấy tất cả các món trong đơn hàng đó
+    const [items] = await pool.query(
+      `
+      SELECT 
+        oi.OrderItemID, 
+        oi.Quantity, 
+        oi.Status, 
+        d.DishName, 
+        d.Price
+      FROM Order_Items oi
+      JOIN Dishes d ON oi.DishID = d.DishID
+      WHERE oi.OrderID = ?
+    `,
+      [currentOrder.OrderID]
+    );
+
+    res.json({ order: currentOrder, items: items });
+  } catch (error) {
+    console.error(
+      `Lỗi khi lấy chi tiết đơn hàng cho bàn ${req.params.tableId}:`,
+      error
+    );
+    res.status(500).json({ message: "Lỗi từ phía server." });
   }
 });
 
