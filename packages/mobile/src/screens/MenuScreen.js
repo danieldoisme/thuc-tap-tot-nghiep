@@ -9,30 +9,64 @@ import {
   Modal,
   TextInput,
   Button,
+  ActivityIndicator,
 } from 'react-native';
-import { DISHES, CATEGORIES } from '../data/mockData';
 import DishItem from '../components/DishItem';
+import axios from 'axios';
+import { API_BASE_URL } from '../apiConfig';
 
 const MenuScreen = ({ navigation }) => {
-  const [selectedCategory, setSelectedCategory] = useState('Tất cả');
-  const [filteredDishes, setFilteredDishes] = useState(DISHES);
   const [cart, setCart] = useState([]);
-
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
+  const [loading, setLoading] = useState(true);
+  const [allDishes, setAllDishes] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(0);
+
   useEffect(() => {
-    if (selectedCategory === 'Tất cả') {
-      setFilteredDishes(DISHES);
-    } else {
-      const filtered = DISHES.filter(
-        dish => dish.category === selectedCategory,
-      );
-      setFilteredDishes(filtered);
+    const fetchMenuData = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/menu`);
+        const menuData = response.data;
+
+        const apiCategories = menuData.map(cat => ({
+          id: cat.CategoryID,
+          name: cat.CategoryName,
+        }));
+        setCategories([{ id: 0, name: 'Tất cả' }, ...apiCategories]);
+
+        let allDishesFromApi = [];
+        menuData.forEach(category => {
+          const dishes = category.dishes.map(dish => ({
+            id: dish.DishID.toString(),
+            name: dish.DishName,
+            price: parseInt(dish.Price),
+            image: dish.ImageURL,
+            description: dish.Description,
+            categoryId: category.CategoryID,
+          }));
+          allDishesFromApi = [...allDishesFromApi, ...dishes];
+        });
+        setAllDishes(allDishesFromApi);
+      } catch (error) {
+        console.error('Lỗi khi tải thực đơn:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenuData();
+  }, []);
+
+  const getFilteredDishes = () => {
+    if (selectedCategoryId === 0) {
+      return allDishes;
     }
-  }, [selectedCategory]);
+    return allDishes.filter(dish => dish.categoryId === selectedCategoryId);
+  };
 
   const handleAddToCart = dish => {
     setSelectedDish(dish);
@@ -44,25 +78,24 @@ const MenuScreen = ({ navigation }) => {
   const confirmAddToCart = () => {
     if (selectedDish) {
       const newCartItem = { ...selectedDish, quantity, notes };
-      // Tạm thời chỉ log ra để kiểm tra.
       setCart(prevCart => [...prevCart, newCartItem]);
-      console.log('Added to cart:', newCartItem);
+      console.log('Đã thêm vào giỏ:', newCartItem);
+      setModalVisible(false);
     }
-    setModalVisible(false);
   };
 
-  const renderCategory = ({ item }) => (
+  const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       style={[
         styles.categoryItem,
-        selectedCategory === item.name && styles.categoryItemSelected,
+        selectedCategoryId === item.id && styles.categoryItemSelected,
       ]}
-      onPress={() => setSelectedCategory(item.name)}
+      onPress={() => setSelectedCategoryId(item.id)}
     >
       <Text
         style={[
           styles.categoryText,
-          selectedCategory === item.name && styles.categoryTextSelected,
+          selectedCategoryId === item.id && styles.categoryTextSelected,
         ]}
       >
         {item.name}
@@ -70,37 +103,42 @@ const MenuScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+      >
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.categoriesContainer}>
         <FlatList
-          data={CATEGORIES}
-          renderItem={renderCategory}
-          keyExtractor={item => item.id}
+          data={categories}
+          renderItem={renderCategoryItem}
+          keyExtractor={item => item.id.toString()}
           horizontal
           showsHorizontalScrollIndicator={false}
         />
       </View>
 
       <FlatList
-        data={filteredDishes}
+        data={getFilteredDishes()}
         renderItem={({ item }) => (
           <DishItem item={item} onAddToCart={handleAddToCart} />
         )}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ paddingBottom: 80 }}
       />
 
-      {cart.length > 0 && (
-        <TouchableOpacity
-          style={styles.cartButton}
-          onPress={() => navigation.navigate('Cart', { cartItems: cart })}
-        >
-          <Text style={styles.cartButtonText}>
-            Xem giỏ hàng ({cart.length})
-          </Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.cartButton}
+        onPress={() => navigation.navigate('Cart', { cartItems: cart })}
+      >
+        <Text style={styles.cartButtonText}>Xem giỏ hàng ({cart.length})</Text>
+      </TouchableOpacity>
 
       <Modal
         animationType="slide"
@@ -111,38 +149,32 @@ const MenuScreen = ({ navigation }) => {
         <View style={styles.modalContainer}>
           <View style={styles.modalView}>
             <Text style={styles.modalTitle}>{selectedDish?.name}</Text>
-
             <View style={styles.quantitySelector}>
-              <TouchableOpacity
+              <Button
+                title="-"
                 onPress={() => setQuantity(q => Math.max(1, q - 1))}
-                style={styles.quantityButton}
-              >
-                <Text style={styles.quantityButtonText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.quantityText}>{quantity}</Text>
-              <TouchableOpacity
-                onPress={() => setQuantity(q => q + 1)}
-                style={styles.quantityButton}
-              >
-                <Text style={styles.quantityButtonText}>+</Text>
-              </TouchableOpacity>
+              />
+              <TextInput
+                style={styles.quantityInput}
+                value={String(quantity)}
+                onChangeText={text => setQuantity(Number(text) || 1)}
+                keyboardType="numeric"
+              />
+              <Button title="+" onPress={() => setQuantity(q => q + 1)} />
             </View>
-
             <TextInput
               style={styles.notesInput}
               placeholder="Thêm ghi chú..."
               value={notes}
               onChangeText={setNotes}
             />
-            <View style={styles.modalButtons}>
-              <Button
-                title="Hủy"
-                onPress={() => setModalVisible(false)}
-                color="gray"
-              />
-              <View style={{ width: 10 }} />
-              <Button title="Xác nhận" onPress={confirmAddToCart} />
-            </View>
+            <Button title="Thêm vào giỏ hàng" onPress={confirmAddToCart} />
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={{ marginTop: 10 }}
+            >
+              <Text>Hủy</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -151,14 +183,14 @@ const MenuScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  categoriesContainer: { paddingVertical: 10, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#F8F8F8' },
+  categoriesContainer: { paddingVertical: 10, backgroundColor: 'white' },
   categoryItem: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     marginHorizontal: 5,
     borderRadius: 20,
-    backgroundColor: '#eee',
+    backgroundColor: '#EFEFEF',
   },
   categoryItemSelected: { backgroundColor: '#FF9F1C' },
   categoryText: { fontSize: 14, color: '#333' },
@@ -198,23 +230,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  quantityButton: {
-    backgroundColor: '#eee',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    width: 50,
+    textAlign: 'center',
+    marginHorizontal: 10,
     borderRadius: 5,
+    paddingVertical: 5,
   },
-  quantityButtonText: { fontSize: 20 },
-  quantityText: { fontSize: 20, marginHorizontal: 20, fontWeight: 'bold' },
   notesInput: {
     width: '100%',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ccc',
     borderRadius: 5,
     padding: 10,
     marginBottom: 20,
+    minHeight: 60,
   },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
 });
 
 export default MenuScreen;
