@@ -91,7 +91,7 @@ const CartScreen = ({ route, navigation }) => {
           text: 'OK',
           onPress: () => {
             clearCart();
-            navigation.navigate('TableDetails', { tableId, tableName, user });
+            navigation.pop(2);
           },
         },
       ]);

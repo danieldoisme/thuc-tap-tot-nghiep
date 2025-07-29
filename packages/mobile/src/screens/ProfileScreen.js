@@ -57,7 +57,10 @@ const ProfileScreen = ({ route, navigation }) => {
   }, [initialUser.userId]);
 
   const handleLogout = () => {
-    navigation.navigate('Login');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
   };
 
   if (loading) {

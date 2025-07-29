@@ -27,7 +27,7 @@ DROP TABLE IF EXISTS Dishes;
 CREATE TABLE Dishes (
     DishID INT PRIMARY KEY AUTO_INCREMENT,
     DishName VARCHAR(150) NOT NULL,
-    Price DECIMAL(10, 0) NOT NULL,
+    Price DECIMAL(10, 2) NOT NULL,
     ImageURL VARCHAR(255),
     CategoryID INT,
     FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
@@ -39,10 +39,10 @@ CREATE TABLE Orders (
     TableID INT,
     UserID INT,
     OrderTime DATETIME DEFAULT CURRENT_TIMESTAMP,
-    SubTotal DECIMAL(12, 0) NOT NULL,
-    VAT_Percentage DECIMAL(4, 2) DEFAULT 8.0,
-    VAT_Amount DECIMAL(12, 0) NOT NULL,
-    TotalAmount DECIMAL(12, 0) NOT NULL,
+    SubTotal DECIMAL(12, 2) NOT NULL,
+    VAT_Percentage DECIMAL(4, 2) DEFAULT 8.00,
+    VAT_Amount DECIMAL(12, 2) NOT NULL,
+    TotalAmount DECIMAL(12, 2) NOT NULL,
     Status VARCHAR(20) DEFAULT 'chờ thanh toán',
     FOREIGN KEY (TableID) REFERENCES Tables(TableID),
     FOREIGN KEY (UserID) REFERENCES Users(UserID)
@@ -55,9 +55,9 @@ CREATE TABLE Order_Items (
     OrderID INT,
     DishID INT,
     Quantity INT NOT NULL,
-    Price DECIMAL(10, 0) NOT NULL,
+    Price DECIMAL(10, 2) NOT NULL,
     Notes VARCHAR(255),
-    Status VARCHAR(20) DEFAULT 'chờ chế biến',
+    Status VARCHAR(20) DEFAULT 'đang chế biến',
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
     FOREIGN KEY (DishID) REFERENCES Dishes(DishID)
 );

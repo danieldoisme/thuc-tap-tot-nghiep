@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,22 @@ import { API_BASE_URL } from '../apiConfig';
 const PaymentScreen = ({ route, navigation }) => {
   const { order, tableName } = route.params;
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Thanh toán',
+      headerStyle: {
+        backgroundColor: '#F9790E',
+      },
+      headerTintColor: '#fff',
+      headerTitleStyle: {
+        fontWeight: 'bold',
+        fontSize: 22,
+      },
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
+    });
+  }, [navigation]);
 
   const handleConfirmPayment = async () => {
     setLoading(true);
@@ -31,57 +47,74 @@ const PaymentScreen = ({ route, navigation }) => {
     }
   };
 
+  const handlePrintBill = () => {
+    Alert.alert('Thành công', 'Đã gửi yêu cầu in hoá đơn thành công!');
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
-      <Text style={styles.itemName}>
-        {item.name} (x{item.quantity})
-      </Text>
-      <Text style={styles.itemPrice}>
-        {(item.price * item.quantity).toLocaleString('vi-VN')} VND
-      </Text>
+      <View style={styles.itemRow}>
+        <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={styles.itemPrice}>
+          {parseInt(item.price).toLocaleString('vi-VN')} VNĐ
+        </Text>
+      </View>
+      <View style={styles.itemRow}>
+        <Text style={styles.itemQuantity}>Số lượng: {item.quantity}</Text>
+        <Text style={styles.itemTotalPrice}>
+          {(item.price * item.quantity).toLocaleString('vi-VN')} VNĐ
+        </Text>
+      </View>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Hóa đơn {tableName}</Text>
-      <FlatList
-        data={order.items}
-        renderItem={renderItem}
-        keyExtractor={item => item.id.toString()}
-        style={styles.list}
-      />
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Tiền hàng</Text>
-          <Text style={styles.summaryValue}>
-            {parseInt(order.SubTotal).toLocaleString('vi-VN')} VND
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>VAT (8%)</Text>
-          <Text style={styles.summaryValue}>
-            {parseInt(order.VAT_Amount).toLocaleString('vi-VN')} VND
-          </Text>
-        </View>
-        <View style={[styles.summaryRow, styles.totalRow]}>
-          <Text style={[styles.summaryLabel, styles.totalLabel]}>
-            Tổng cộng
-          </Text>
-          <Text style={[styles.summaryValue, styles.totalValue]}>
-            {parseInt(order.TotalAmount).toLocaleString('vi-VN')} VND
-          </Text>
+      <View style={styles.billContainer}>
+        <Text style={styles.title}>{tableName}</Text>
+        <FlatList
+          data={order.items}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          style={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+        <View style={styles.dashedSeparator} />
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tổng tiền</Text>
+            <Text style={styles.summaryValue}>
+              {parseInt(order.SubTotal).toLocaleString('vi-VN')} VNĐ
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Thuế VAT</Text>
+            <Text style={styles.summaryValue}>8%</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, styles.totalLabel]}>
+              Thanh toán
+            </Text>
+            <Text style={[styles.summaryValue, styles.totalValue]}>
+              {parseInt(order.TotalAmount).toLocaleString('vi-VN')} VNĐ
+            </Text>
+          </View>
         </View>
       </View>
-      <TouchableOpacity
-        style={[styles.confirmButton, loading && styles.buttonDisabled]}
-        onPress={handleConfirmPayment}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Đang xử lý...' : 'Xác nhận Thanh toán'}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.printButton} onPress={handlePrintBill}>
+          <Text style={styles.printButtonText}>In hoá đơn</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.confirmButton, loading && styles.buttonDisabled]}
+          onPress={handleConfirmPayment}
+          disabled={loading}
+        >
+          <Text style={styles.confirmButtonText}>
+            {loading ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -89,78 +122,116 @@ const PaymentScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#F9790E',
+    justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  list: {
+  billContainer: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 20,
+    padding: 20,
     flex: 1,
   },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  list: {
+    flexGrow: 0,
+  },
   itemContainer: {
+    paddingVertical: 15,
+  },
+  itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: 'white',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   itemPrice: {
     fontSize: 16,
+    color: '#666',
+  },
+  itemQuantity: {
+    fontSize: 16,
+    color: '#666',
+  },
+  itemTotalPrice: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#eee',
+  },
+  dashedSeparator: {
+    height: 1,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#F9790E',
+    borderStyle: 'dashed',
+    marginVertical: 20,
   },
   summaryContainer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
+    paddingTop: 10,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   summaryLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    color: '#333',
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '500',
   },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 10,
-  },
   totalLabel: {
-    fontSize: 20,
     fontWeight: 'bold',
-    color: '#000',
+    fontSize: 20,
   },
   totalValue: {
-    fontSize: 20,
     fontWeight: 'bold',
-    color: '#d32f2f',
+    fontSize: 20,
+    color: '#000',
   },
-  confirmButton: {
-    backgroundColor: '#28a745',
-    padding: 20,
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  printButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 18,
+    borderRadius: 30,
     alignItems: 'center',
-    margin: 10,
-    borderRadius: 5,
+    marginBottom: 15,
   },
-  buttonDisabled: {
-    backgroundColor: '#A9A9A9',
-  },
-  buttonText: {
-    color: '#fff',
+  printButtonText: {
+    color: '#F9790E',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  confirmButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 18,
+    borderRadius: 30,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: '#F9790E',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    backgroundColor: '#fde4ce',
   },
 });
 

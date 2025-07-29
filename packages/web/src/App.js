@@ -70,9 +70,11 @@ const App = () => {
     };
 
     socket.on("order_status_updated", handleStatusUpdate);
+    socket.on("new_order", handleStatusUpdate);
 
     return () => {
       socket.off("order_status_updated", handleStatusUpdate);
+      socket.off("new_order", handleStatusUpdate);
     };
   }, [currentPage, selectedDate, fetchAndSetDishes]);
 

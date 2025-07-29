@@ -187,7 +187,7 @@ app.post("/api/orders", async (req, res) => {
       "SELECT SUM(Price * Quantity) as total FROM Order_Items WHERE OrderID = ?",
       [orderId]
     );
-    const subTotal = allItems[0].total || 0;
+    const subTotal = parseFloat(allItems[0].total) || 0;
     const vatAmount = subTotal * 0.08;
     const totalAmount = subTotal + vatAmount;
 
@@ -262,33 +262,19 @@ app.get("/api/orders/table/:tableId", async (req, res) => {
 
 // --- 6. API CẬP NHẬT TRẠNG THÁI MÓN ĂN -> "đã phục vụ" ---
 app.patch("/api/order-items/:orderItemId/serve", async (req, res) => {
+  const { orderItemId } = req.params;
   try {
-    const { orderItemId } = req.params;
-
-    const [result] = await pool.execute(
+    await pool.query(
       "UPDATE Order_Items SET Status = 'đã phục vụ' WHERE OrderItemID = ?",
       [orderItemId]
     );
 
-    // Kiểm tra xem có dòng nào được cập nhật không
-    if (result.affectedRows === 0) {
-      return res
-        .status(404)
-        .json({ message: "Không tìm thấy món ăn để cập nhật." });
-    }
+    // Gửi sự kiện cập nhật
+    io.emit("order_status_updated", { orderItemId });
 
-    // Gửi sự kiện để các client khác có thể cập nhật UI
-    io.emit("item_status_updated", {
-      orderItemId: orderItemId,
-      status: "đã phục vụ",
-    });
-
-    res.json({ message: "Cập nhật trạng thái thành công." });
+    res.json({ message: "Cập nhật trạng thái món ăn thành công." });
   } catch (error) {
-    console.error(
-      `Lỗi khi cập nhật trạng thái cho món ăn ${req.params.orderItemId}:`,
-      error
-    );
+    console.error("Lỗi khi cập nhật trạng thái món ăn:", error);
     res.status(500).json({ message: "Lỗi từ phía server." });
   }
 });
@@ -435,27 +421,22 @@ app.get("/api/kitchen-orders", async (req, res) => {
   }
 });
 
-// API CẬP NHẬT TRẠNG THÁI MÓN ĂN -> 'đã hoàn thành'
+// API CẬP NHẬT TRẠNG THÁI MÓN ĂN -> "đã hoàn thành"
 app.patch("/api/order-items/:orderItemId/complete", async (req, res) => {
   const { orderItemId } = req.params;
   try {
-    const updateQuery =
-      "UPDATE Order_Items SET Status = 'đã hoàn thành' WHERE OrderItemID = ?";
-    const [result] = await pool.query(updateQuery, [orderItemId]);
+    await pool.query(
+      "UPDATE Order_Items SET Status = 'đã hoàn thành' WHERE OrderItemID = ?",
+      [orderItemId]
+    );
 
-    if (result.affectedRows > 0) {
-      console.log(
-        `Món ăn ${orderItemId} đã được cập nhật thành 'đã hoàn thành'.`
-      );
-      // Gửi sự kiện đến tất cả các client đang kết nối
-      io.emit("order_status_updated", { orderItemId, status: "đã hoàn thành" });
-      res.status(200).json({ message: "Cập nhật trạng thái thành công" });
-    } else {
-      res.status(404).json({ message: "Không tìm thấy món ăn" });
-    }
+    // Gửi sự kiện cập nhật
+    io.emit("order_status_updated", { orderItemId });
+
+    res.json({ message: "Món ăn đã được hoàn thành." });
   } catch (error) {
-    console.error(`Lỗi khi cập nhật món ăn ${orderItemId}:`, error);
-    res.status(500).json({ message: "Lỗi từ phía server" });
+    console.error("Lỗi khi cập nhật trạng thái món ăn:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
   }
 });
 

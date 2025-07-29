@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import axios from 'axios';
-import { API_BASE_URL } from '../apiConfig';
+import { API_BASE_URL, socket } from '../apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '@react-native-vector-icons/ionicons';
 import { useCart } from '../context/CartContext';
@@ -79,6 +79,21 @@ const TableDetailsScreen = ({ route, navigation }) => {
       fetchOrderDetails();
     }, [fetchOrderDetails]),
   );
+
+  useEffect(() => {
+    const handleOrderStatusUpdate = () => {
+      console.log(
+        'Nhận được cập nhật trạng thái món ăn, tải lại chi tiết bàn...',
+      );
+      fetchOrderDetails();
+    };
+
+    socket.on('order_status_updated', handleOrderStatusUpdate);
+
+    return () => {
+      socket.off('order_status_updated', handleOrderStatusUpdate);
+    };
+  }, [fetchOrderDetails]);
 
   const handleNavigateToPayment = () => {
     if (!order || order.items.length === 0) {
