@@ -15,7 +15,7 @@ import DishItem from '../components/DishItem';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 
-const MenuScreen = ({ navigation, route }) => {
+const MenuScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
 
   const [cart, setCart] = useState([]);
@@ -47,7 +47,7 @@ const MenuScreen = ({ navigation, route }) => {
             id: dish.DishID.toString(),
             name: dish.DishName,
             price: parseInt(dish.Price),
-            image: dish.ImageURL,
+            image: `${API_BASE_URL}${dish.ImageURL}`,
             description: dish.Description,
             categoryId: category.CategoryID,
           }));
