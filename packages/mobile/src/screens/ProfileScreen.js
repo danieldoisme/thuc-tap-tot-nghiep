@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
+import Ionicons from '@react-native-vector-icons/ionicons';
 
 const ProfileScreen = ({ route, navigation }) => {
   const { user: initialUser } = route.params;
@@ -17,7 +18,28 @@ const ProfileScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    navigation.setOptions({
+      title: 'Tài khoản',
+      headerStyle: {
+        backgroundColor: '#F9790E',
+      },
+      headerTintColor: '#fff',
+      headerTitleStyle: {
+        fontWeight: 'bold',
+        fontSize: 22,
+      },
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
+    });
+  }, [navigation]);
+
+  useEffect(() => {
     const fetchUserInfo = async () => {
+      if (!initialUser?.userId) {
+        Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng.');
+        setLoading(false);
+        return;
+      }
       try {
         const response = await axios.get(
           `${API_BASE_URL}/api/user/${initialUser.userId}`,
@@ -41,7 +63,7 @@ const ProfileScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#F9790E" />
       </SafeAreaView>
     );
   }
@@ -49,18 +71,29 @@ const ProfileScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.profileContainer}>
-        <Text style={styles.title}>Thông tin Nhân viên</Text>
-        {userInfo ? (
-          <View style={styles.infoBox}>
-            <Text style={styles.label}>Họ và Tên:</Text>
-            <Text style={styles.info}>{userInfo.fullName}</Text>
-            <Text style={styles.label}>Mã Nhân viên:</Text>
-            <Text style={styles.info}>{userInfo.userCode}</Text>
+        <View>
+          <View style={styles.avatarContainer}>
+            <Ionicons name="person-circle-outline" size={100} color="#F9790E" />
           </View>
-        ) : (
-          <Text>Không có thông tin để hiển thị.</Text>
-        )}
+          {userInfo ? (
+            <View style={styles.infoBox}>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Họ và Tên:</Text>
+                <Text style={styles.info}>{userInfo.fullName}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Mã Nhân viên:</Text>
+                <Text style={styles.info}>{userInfo.userCode}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.errorText}>
+              Không có thông tin để hiển thị.
+            </Text>
+          )}
+        </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={22} color="#fff" />
           <Text style={styles.logoutButtonText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
@@ -71,7 +104,7 @@ const ProfileScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#fff',
   },
   centered: {
     justifyContent: 'center',
@@ -80,38 +113,56 @@ const styles = StyleSheet.create({
   profileContainer: {
     flex: 1,
     padding: 20,
+    justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+  avatarContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
   },
   infoBox: {
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 10,
     marginBottom: 30,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f2f2f2',
   },
   label: {
     fontSize: 16,
-    color: '#555',
+    color: '#888',
   },
   info: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
   logoutButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#F9790E',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    margin: 20,
   },
   logoutButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  errorText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#888',
   },
 });
 

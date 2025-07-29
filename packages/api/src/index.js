@@ -93,7 +93,7 @@ app.post("/api/login", async (req, res) => {
 app.get("/api/tables", async (req, res) => {
   try {
     const [tables] = await pool.query(
-      "SELECT TableID, TableName, Status FROM Tables ORDER BY TableName"
+      "SELECT TableID, TableName, Status FROM Tables ORDER BY CAST(SUBSTRING(TableName, 5) AS UNSIGNED)"
     );
     res.json(tables);
   } catch (error) {
