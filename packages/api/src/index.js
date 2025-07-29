@@ -177,8 +177,11 @@ app.post("/api/orders", async (req, res) => {
     // Nếu tất cả thành công, commit transaction
     await connection.commit();
 
-    // Gửi thông báo đến nhà bếp qua Socket.IO
+    // Gửi thông báo đến nhà bếp
     io.emit("new_order");
+
+    // Gửi sự kiện cập nhật trạng thái bàn
+    io.emit("table_status_updated", { tableId: tableId, status: "có khách" });
 
     res
       .status(201)

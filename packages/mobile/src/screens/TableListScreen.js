@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,29 +10,51 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
+import io from 'socket.io-client';
+import { useFocusEffect } from '@react-navigation/native';
+
+const socket = io(API_BASE_URL);
 
 const TableListScreen = ({ navigation, route }) => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchTables = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/tables`);
+      const formattedData = response.data.map(table => ({
+        id: table.TableID.toString(),
+        name: table.TableName,
+        status: table.Status,
+      }));
+      setTables(formattedData);
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách bàn:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTables();
+    }, [fetchTables]),
+  );
+
   useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api/tables`);
-        const formattedData = response.data.map(table => ({
-          id: table.TableID.toString(),
-          name: table.TableName,
-          status: table.Status,
-        }));
-        setTables(formattedData);
-      } catch (error) {
-        console.error('Lỗi khi tải danh sách bàn:', error);
-      } finally {
-        setLoading(false);
-      }
+    const handleTableStatusUpdate = ({ tableId, status }) => {
+      setTables(currentTables =>
+        currentTables.map(table =>
+          table.id === tableId.toString() ? { ...table, status } : table,
+        ),
+      );
     };
 
-    fetchTables();
+    socket.on('table_status_updated', handleTableStatusUpdate);
+
+    return () => {
+      socket.off('table_status_updated', handleTableStatusUpdate);
+    };
   }, []);
 
   const renderTable = ({ item }) => {
