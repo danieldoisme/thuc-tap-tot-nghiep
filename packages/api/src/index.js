@@ -332,6 +332,32 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
+// --- 8. API LẤY THÔNG TIN NHÂN VIÊN ---
+app.get("/api/user/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const [users] = await pool.query(
+      "SELECT UserID, UserCode, FullName FROM Users WHERE UserID = ?",
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng." });
+    }
+
+    const user = users[0];
+    res.json({
+      userId: user.UserID,
+      fullName: user.FullName,
+      userCode: user.UserCode,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy thông tin người dùng:", error);
+    res.status(500).json({ message: "Lỗi từ phía server." });
+  }
+});
+
 // ===============================================
 // APIs DÀNH CHO ỨNG DỤNG WEB
 // ===============================================

@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import LoginScreen from '../screens/LoginScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import TableListScreen from '../screens/TableListScreen';
 import TableDetailsScreen from '../screens/TableDetailsScreen';
 import MenuScreen from '../screens/MenuScreen';
@@ -31,6 +32,11 @@ const AppNavigator = () => {
           name="Login"
           component={LoginScreen}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ title: 'Tài khoản' }}
         />
         <Stack.Screen
           name="TableList"

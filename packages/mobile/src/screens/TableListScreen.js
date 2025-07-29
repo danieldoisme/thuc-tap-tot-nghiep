@@ -97,7 +97,21 @@ const TableListScreen = ({ navigation, route }) => {
         keyExtractor={item => item.id}
         numColumns={2}
         contentContainerStyle={styles.list}
+        style={{ flex: 1 }}
       />
+      <View style={styles.footer}>
+        <TouchableOpacity style={[styles.footerButton, styles.activeButton]}>
+          <Text style={styles.footerButtonText}>Bàn</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.footerButton}
+          onPress={() =>
+            navigation.navigate('Profile', { user: route.params.user })
+          }
+        >
+          <Text style={styles.footerButtonText}>Tài khoản</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -139,6 +153,26 @@ const styles = StyleSheet.create({
   tableName: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  footer: {
+    flexDirection: 'row',
+    height: 60,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  footerButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerButtonText: {
+    fontSize: 16,
+    color: '#888',
+  },
+  activeButton: {
+    borderTopWidth: 2,
+    borderTopColor: '#FF9F1C',
   },
 });
 
