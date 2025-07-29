@@ -13,7 +13,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 
 const TableDetailsScreen = ({ route, navigation }) => {
-  const { tableId, tableName } = route.params;
+  const { tableId, tableName, user } = route.params;
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +134,13 @@ const TableDetailsScreen = ({ route, navigation }) => {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.orderButton}
-          onPress={() => navigation.navigate('Menu')}
+          onPress={() =>
+            navigation.navigate('Menu', {
+              tableId: tableId,
+              tableName: tableName,
+              user: user,
+            })
+          }
         >
           <Text style={styles.buttonText}>Đặt món</Text>
         </TouchableOpacity>

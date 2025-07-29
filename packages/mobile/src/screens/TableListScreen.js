@@ -11,7 +11,7 @@ import {
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 
-const TableListScreen = ({ navigation }) => {
+const TableListScreen = ({ navigation, route }) => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,6 +44,7 @@ const TableListScreen = ({ navigation }) => {
           navigation.navigate('TableDetails', {
             tableId: item.id,
             tableName: item.name,
+            user: route.params.user,
           })
         }
       >

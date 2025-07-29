@@ -15,7 +15,9 @@ import DishItem from '../components/DishItem';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 
-const MenuScreen = ({ navigation }) => {
+const MenuScreen = ({ navigation, route }) => {
+  const { tableId, tableName, user } = route.params;
+
   const [cart, setCart] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
@@ -135,7 +137,14 @@ const MenuScreen = ({ navigation }) => {
 
       <TouchableOpacity
         style={styles.cartButton}
-        onPress={() => navigation.navigate('Cart', { cartItems: cart })}
+        onPress={() =>
+          navigation.navigate('Cart', {
+            cartItems: cart,
+            tableId: tableId,
+            tableName: tableName,
+            user: user,
+          })
+        }
       >
         <Text style={styles.cartButtonText}>Xem giỏ hàng ({cart.length})</Text>
       </TouchableOpacity>
