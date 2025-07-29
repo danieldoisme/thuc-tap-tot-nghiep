@@ -270,6 +270,65 @@ app.patch("/api/order-items/:orderItemId/serve", async (req, res) => {
   }
 });
 
+// --- 7. API THANH TOÁN (CHECKOUT) ---
+app.post("/api/checkout", async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ message: "Vui lòng cung cấp mã đơn hàng." });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Lấy thông tin TableID từ OrderID để cập nhật bàn
+    const [orders] = await connection.execute(
+      "SELECT TableID FROM Orders WHERE OrderID = ?",
+      [orderId]
+    );
+    if (orders.length === 0) {
+      throw new Error("Không tìm thấy đơn hàng.");
+    }
+    const tableId = orders[0].TableID;
+
+    // Cập nhật trạng thái đơn hàng thành 'đã thanh toán'
+    const [orderUpdateResult] = await connection.execute(
+      "UPDATE Orders SET Status = 'đã thanh toán' WHERE OrderID = ?",
+      [orderId]
+    );
+
+    if (orderUpdateResult.affectedRows === 0) {
+      throw new Error("Không thể cập nhật trạng thái đơn hàng.");
+    }
+
+    // Cập nhật trạng thái bàn thành 'trống'
+    await connection.execute(
+      "UPDATE Tables SET Status = 'trống' WHERE TableID = ?",
+      [tableId]
+    );
+
+    // Nếu tất cả thành công, commit transaction
+    await connection.commit();
+
+    // Gửi sự kiện để cập nhật trạng thái bàn trên các client
+    io.emit("table_status_updated", { tableId: tableId, status: "trống" });
+
+    res.json({ message: "Thanh toán thành công." });
+  } catch (error) {
+    await connection.rollback();
+    console.error(`Lỗi khi thanh toán cho đơn hàng ${orderId}:`, error);
+    // Phân biệt lỗi do client hay server
+    if (error.message === "Không tìm thấy đơn hàng.") {
+      res.status(404).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: "Lỗi từ phía server." });
+    }
+  } finally {
+    connection.release();
+  }
+});
+
 // ===============================================
 // APIs DÀNH CHO ỨNG DỤNG WEB
 // ===============================================
