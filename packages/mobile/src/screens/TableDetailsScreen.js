@@ -52,34 +52,16 @@ const TableDetailsScreen = ({ route, navigation }) => {
     }, [fetchOrderDetails]),
   );
 
-  const handleCheckout = async () => {
-    if (!order) {
+  const handleNavigateToPayment = () => {
+    if (!order || order.items.length === 0) {
       Alert.alert('Thông báo', 'Bàn này không có gì để thanh toán.');
       return;
     }
-
-    Alert.alert(
-      'Xác nhận thanh toán',
-      `Bạn có chắc chắn muốn thanh toán cho ${tableName}?`,
-      [
-        { text: 'Hủy' },
-        {
-          text: 'Đồng ý',
-          onPress: async () => {
-            try {
-              await axios.post(`${API_BASE_URL}/api/checkout`, {
-                orderId: order.OrderID,
-              });
-              Alert.alert('Thành công', 'Thanh toán hóa đơn thành công!');
-              navigation.goBack();
-            } catch (error) {
-              console.error('Lỗi khi thanh toán:', error);
-              Alert.alert('Lỗi', 'Đã có lỗi xảy ra khi thanh toán.');
-            }
-          },
-        },
-      ],
-    );
+    navigation.navigate('Payment', {
+      order: order,
+      tableName: tableName,
+      user: user,
+    });
   };
 
   const handleMarkAsServed = async orderItemId => {
@@ -159,7 +141,7 @@ const TableDetailsScreen = ({ route, navigation }) => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.checkoutButton}
-          onPress={handleCheckout}
+          onPress={handleNavigateToPayment}
         >
           <Text style={styles.buttonText}>Thanh toán</Text>
         </TouchableOpacity>
