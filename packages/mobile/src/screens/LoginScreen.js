@@ -63,6 +63,7 @@ const LoginScreen = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Mã nhân viên"
+        placeholderTextColor="#A9A9A9"
         value={userCode}
         onChangeText={setUserCode}
         autoCapitalize="none"
@@ -70,6 +71,7 @@ const LoginScreen = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Mật khẩu"
+        placeholderTextColor="#A9A9A9"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -97,31 +99,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 40,
+    textAlign: 'left',
+    marginBottom: 60,
+    color: '#F9790E',
+    paddingHorizontal: 10,
   },
   input: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 15,
+    height: 60,
+    backgroundColor: '#FFF4E0',
+    borderRadius: 30,
+    paddingHorizontal: 25,
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#333',
   },
   button: {
-    backgroundColor: '#007BFF',
-    padding: 15,
-    borderRadius: 5,
+    backgroundColor: '#F9790E',
+    padding: 18,
+    borderRadius: 30,
     alignItems: 'center',
+    marginTop: 20,
   },
   buttonDisabled: {
     backgroundColor: '#A9A9A9',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

@@ -7,19 +7,58 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import io from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
+import Ionicons from '@react-native-vector-icons/ionicons';
 
 const socket = io(API_BASE_URL);
+
+const TableIcon = ({ isOccupied }) => {
+  const squareColor = isOccupied ? '#F9790E' : '#E0E0E0';
+  return (
+    <View style={styles.tableIconContainer}>
+      <View
+        style={[styles.tableIconSquare, { backgroundColor: squareColor }]}
+      />
+      <View
+        style={[styles.tableIconSquare, { backgroundColor: squareColor }]}
+      />
+      <View
+        style={[styles.tableIconSquare, { backgroundColor: squareColor }]}
+      />
+      <View
+        style={[styles.tableIconSquare, { backgroundColor: squareColor }]}
+      />
+    </View>
+  );
+};
 
 const TableListScreen = ({ navigation, route }) => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Danh sách bàn ăn',
+      headerStyle: {
+        backgroundColor: '#F9790E',
+      },
+      headerTintColor: '#fff',
+      headerTitleStyle: {
+        fontWeight: 'bold',
+        fontSize: 22,
+      },
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
+    });
+  }, [navigation]);
+
   const fetchTables = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/api/tables`);
       const formattedData = response.data.map(table => ({
@@ -70,12 +109,7 @@ const TableListScreen = ({ navigation, route }) => {
           })
         }
       >
-        <View
-          style={[
-            styles.tableIcon,
-            isOccupied ? styles.occupied : styles.empty,
-          ]}
-        ></View>
+        <TableIcon isOccupied={isOccupied} />
         <Text style={styles.tableName}>{item.name}</Text>
       </TouchableOpacity>
     );
@@ -84,7 +118,7 @@ const TableListScreen = ({ navigation, route }) => {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#F9790E" />
       </SafeAreaView>
     );
   }
@@ -97,11 +131,11 @@ const TableListScreen = ({ navigation, route }) => {
         keyExtractor={item => item.id}
         numColumns={2}
         contentContainerStyle={styles.list}
-        style={{ flex: 1 }}
       />
       <View style={styles.footer}>
-        <TouchableOpacity style={[styles.footerButton, styles.activeButton]}>
-          <Text style={styles.footerButtonText}>Bàn</Text>
+        <TouchableOpacity style={styles.footerButton}>
+          <Ionicons name="grid-outline" size={24} color="#F9790E" />
+          <Text style={[styles.footerButtonText, styles.activeText]}>Bàn</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.footerButton}
@@ -109,6 +143,7 @@ const TableListScreen = ({ navigation, route }) => {
             navigation.navigate('Profile', { user: route.params.user })
           }
         >
+          <Ionicons name="person-outline" size={24} color="#888" />
           <Text style={styles.footerButtonText}>Tài khoản</Text>
         </TouchableOpacity>
       </View>
@@ -126,40 +161,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingTop: 20,
   },
   tableItem: {
     flex: 1,
     alignItems: 'center',
-    margin: 10,
-    padding: 20,
-    borderRadius: 10,
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#eee',
+    marginBottom: 30,
   },
-  tableIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 15,
+  tableIconContainer: {
+    width: 120,
+    height: 120,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
     marginBottom: 10,
   },
-  empty: {
-    backgroundColor: '#E0E0E0',
-  },
-  occupied: {
-    backgroundColor: '#FF9F1C',
+  tableIconSquare: {
+    width: '47%',
+    height: '47%',
+    borderRadius: 15,
   },
   tableName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
   },
   footer: {
     flexDirection: 'row',
-    height: 60,
+    height: 70,
     borderTopWidth: 1,
     borderTopColor: '#eee',
     backgroundColor: '#fff',
+    paddingBottom: 5,
   },
   footerButton: {
     flex: 1,
@@ -167,12 +202,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#888',
+    marginTop: 2,
   },
-  activeButton: {
-    borderTopWidth: 2,
-    borderTopColor: '#FF9F1C',
+  activeText: {
+    color: '#F9790E',
+    fontWeight: 'bold',
   },
 });
 
