@@ -104,3 +104,53 @@ export const initDB = async () => {
     throw error;
   }
 };
+
+// Hàm lưu danh sách bàn vào CSDL cục bộ
+export const saveTables = async (db, tables) => {
+  const insertQuery = `
+    INSERT OR REPLACE INTO tables (TableID, TableName, Status) VALUES (?, ?, ?);
+  `;
+  return db.transaction(tx => {
+    tx.executeSql('DELETE FROM tables;');
+    tables.forEach(table => {
+      tx.executeSql(insertQuery, [
+        table.TableID,
+        table.TableName,
+        table.Status,
+      ]);
+    });
+  });
+};
+
+// Hàm lưu thực đơn (danh mục và món ăn) vào CSDL cục bộ
+export const saveMenu = async (db, menu) => {
+  const insertCategoryQuery = `
+    INSERT OR REPLACE INTO categories (CategoryID, CategoryName) VALUES (?, ?);
+  `;
+  const insertDishQuery = `
+    INSERT OR REPLACE INTO dishes (DishID, DishName, Price, ImageURL, CategoryID) VALUES (?, ?, ?, ?, ?);
+  `;
+
+  return db.transaction(tx => {
+    // Xóa dữ liệu cũ
+    tx.executeSql('DELETE FROM dishes;');
+    tx.executeSql('DELETE FROM categories;');
+
+    // Chèn dữ liệu mới
+    menu.forEach(category => {
+      tx.executeSql(insertCategoryQuery, [
+        category.CategoryID,
+        category.CategoryName,
+      ]);
+      category.dishes.forEach(dish => {
+        tx.executeSql(insertDishQuery, [
+          dish.DishID,
+          dish.DishName,
+          dish.Price,
+          dish.ImageURL,
+          category.CategoryID,
+        ]);
+      });
+    });
+  });
+};
