@@ -10,48 +10,51 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import axios from 'axios';
-import { API_BASE_URL, socket } from '../apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '@react-native-vector-icons/ionicons';
+import { useNetInfo } from '@react-native-community/netinfo';
+import axios from 'axios';
+
 import { useCart } from '../context/CartContext';
+import { API_BASE_URL, socket } from '../apiConfig';
 
 const TableDetailsScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { clearCart } = useCart();
+  const netInfo = useNetInfo();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Xóa giỏ hàng mỗi khi quay lại màn hình này
   useFocusEffect(
     useCallback(() => {
       clearCart();
     }, [clearCart]),
   );
 
+  // Thiết lập header
   useEffect(() => {
-    navigation.setOptions({
-      title: tableName,
-      headerStyle: {
-        backgroundColor: '#F9790E',
-      },
-      headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-        fontSize: 22,
-      },
-      headerTitleAlign: 'center',
-      headerShadowVisible: false,
-    });
+    navigation.setOptions({ title: tableName });
   }, [navigation, tableName]);
 
+  // Hàm lấy chi tiết đơn hàng
   const fetchOrderDetails = useCallback(async () => {
+    // Nếu offline, không làm gì cả và hiển thị giao diện bàn trống
+    if (netInfo.isConnected === false) {
+      setOrder(null);
+      setLoading(false);
+      console.log('Đang ở chế độ offline, không tải chi tiết đơn hàng.');
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await axios.get(
         `${API_BASE_URL}/api/orders/table/${tableId}`,
       );
       const { order: orderInfo, items: orderItems } = response.data;
+
       if (orderInfo) {
         const formattedItems = orderItems.map(item => ({
           id: item.OrderItemID,
@@ -63,15 +66,15 @@ const TableDetailsScreen = ({ route, navigation }) => {
           imageUrl: item.ImageURL ? `${API_BASE_URL}/${item.ImageURL}` : null,
         }));
 
+        // Sắp xếp món ăn theo trạng thái
         const statusPriority = {
           'đã hoàn thành': 1,
           'đang chế biến': 2,
           'đã phục vụ': 3,
         };
-
         formattedItems.sort((a, b) => {
-          const priorityA = statusPriority[a.status] || 99;
-          const priorityB = statusPriority[b.status] || 99;
+          const priorityA = statusPriority[a.status] || 4;
+          const priorityB = statusPriority[b.status] || 4;
           return priorityA - priorityB;
         });
 
@@ -80,56 +83,36 @@ const TableDetailsScreen = ({ route, navigation }) => {
         setOrder(null);
       }
     } catch (error) {
-      console.error(`Lỗi khi tải chi tiết bàn ${tableId}:`, error);
-      Alert.alert('Lỗi', 'Không thể tải dữ liệu của bàn.');
+      console.error('Lỗi khi tải chi tiết đơn hàng:', error);
+      Alert.alert('Lỗi', 'Không thể tải được chi tiết đơn hàng.');
+      setOrder(null);
     } finally {
       setLoading(false);
     }
-  }, [tableId]);
+  }, [tableId, netInfo.isConnected]);
 
+  // Lấy dữ liệu khi màn hình được focus hoặc khi có mạng trở lại
   useFocusEffect(
     useCallback(() => {
       fetchOrderDetails();
     }, [fetchOrderDetails]),
   );
 
+  // Lắng nghe sự kiện từ socket
   useEffect(() => {
-    const handleOrderStatusUpdate = () => {
-      console.log(
-        'Nhận được cập nhật trạng thái món ăn, tải lại chi tiết bàn...',
-      );
+    const handleUpdate = () => {
       fetchOrderDetails();
     };
-
-    socket.on('order_status_updated', handleOrderStatusUpdate);
+    socket.on('order_updated', handleUpdate);
+    socket.on('order_status_updated', handleUpdate);
 
     return () => {
-      socket.off('order_status_updated', handleOrderStatusUpdate);
+      socket.off('order_updated', handleUpdate);
+      socket.off('order_status_updated', handleUpdate);
     };
   }, [fetchOrderDetails]);
 
-  const handleNavigateToPayment = () => {
-    if (!order || order.items.length === 0) {
-      Alert.alert('Thông báo', 'Bàn này không có gì để thanh toán.');
-      return;
-    }
-    navigation.navigate('Payment', {
-      order: order,
-      tableName: tableName,
-      user: user,
-    });
-  };
-
-  const handleMarkAsServed = async orderItemId => {
-    try {
-      await axios.patch(`${API_BASE_URL}/api/order-items/${orderItemId}/serve`);
-      fetchOrderDetails();
-    } catch (error) {
-      console.error(`Lỗi khi cập nhật món ăn ${orderItemId}:`, error);
-      Alert.alert('Lỗi', 'Không thể cập nhật trạng thái món ăn.');
-    }
-  };
-
+  // Các hàm xử lý giao diện...
   const getStatusStyle = status => {
     switch (status) {
       case 'đã hoàn thành':
@@ -144,13 +127,7 @@ const TableDetailsScreen = ({ route, navigation }) => {
   };
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.itemContainer}
-      onPress={() =>
-        item.status === 'đã hoàn thành' && handleMarkAsServed(item.id)
-      }
-      disabled={item.status !== 'đã hoàn thành'}
-    >
+    <View style={styles.itemContainer}>
       <Image
         source={
           item.imageUrl
@@ -162,7 +139,7 @@ const TableDetailsScreen = ({ route, navigation }) => {
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
         <View style={styles.statusContainer}>
-          <Text style={styles.itemQuantity}>Số lượng {item.quantity}</Text>
+          <Text style={styles.itemQuantity}>Số lượng: {item.quantity}</Text>
           <Text style={[styles.itemStatus, getStatusStyle(item.status)]}>
             {' | '}● {item.status}
           </Text>
@@ -171,62 +148,66 @@ const TableDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.itemNotes}>Ghi chú: {item.notes}</Text>
         )}
       </View>
-      {item.status === 'đã hoàn thành' && (
-        <View style={styles.checkmarkContainer}>
-          <Icon name="checkmark-circle" size={24} color="#fd9827" />
-        </View>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 
   if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#fd9827" />
+        <ActivityIndicator size="large" color="#F9790E" />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Chi tiết bàn</Text>
-
-      {order && order.items.length > 0 ? (
-        <FlatList
-          data={order.items}
-          renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
-          style={styles.list}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          refreshing={loading}
-          onRefresh={fetchOrderDetails}
-        />
+      {order ? (
+        // Giao diện khi có đơn hàng
+        <>
+          <FlatList
+            data={order.items}
+            renderItem={renderItem}
+            keyExtractor={item => item.id.toString()}
+            ListHeaderComponent={
+              <Text style={styles.listHeader}>Các món đã gọi</Text>
+            }
+          />
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() =>
+                navigation.navigate('Menu', { tableId, tableName, user })
+              }
+            >
+              <Icon name="add-circle-outline" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Thêm món</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() =>
+                navigation.navigate('Payment', { order, tableName })
+              }
+            >
+              <Icon name="cash-outline" size={24} color="#fff" />
+              <Text style={styles.actionButtonText}>Thanh toán</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Bàn trống, hãy đặt món!</Text>
+        // Giao diện khi bàn trống hoặc offline
+        <View style={[styles.container, styles.centered]}>
+          <Icon name="restaurant-outline" size={80} color="#ccc" />
+          <Text style={styles.emptyText}>Bàn này hiện đang trống</Text>
+          <TouchableOpacity
+            style={styles.orderButton}
+            onPress={() =>
+              navigation.navigate('Menu', { tableId, tableName, user })
+            }
+          >
+            <Text style={styles.orderButtonText}>Tạo đơn hàng mới</Text>
+          </TouchableOpacity>
         </View>
       )}
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() =>
-            navigation.navigate('Menu', {
-              tableId,
-              tableName,
-              user,
-            })
-          }
-        >
-          <Text style={styles.buttonText}>Thêm món</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleNavigateToPayment}
-        >
-          <Text style={styles.buttonText}>Thanh toán</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -239,45 +220,36 @@ const styles = StyleSheet.create({
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  title: {
-    fontSize: 24,
+  listHeader: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  list: {
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   itemContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
     padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    alignItems: 'center',
   },
   itemImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
     marginRight: 15,
   },
   itemInfo: {
     flex: 1,
-    justifyContent: 'center',
   },
   itemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#333',
   },
   statusContainer: {
@@ -286,51 +258,57 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   itemQuantity: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
   },
   itemStatus: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    textTransform: 'capitalize',
+    fontSize: 15,
+    fontWeight: '500',
   },
   itemNotes: {
     fontSize: 14,
-    color: '#666',
+    color: '#888',
     fontStyle: 'italic',
     marginTop: 4,
   },
-  checkmarkContainer: {
-    marginLeft: 10,
-  },
-  buttonContainer: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: '#f8f9fa',
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   actionButton: {
-    backgroundColor: '#fd9827',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+    flexDirection: 'row',
+    backgroundColor: '#F9790E',
+    paddingHorizontal: 25,
+    paddingVertical: 12,
     borderRadius: 30,
-    flex: 1,
-    marginHorizontal: 10,
     alignItems: 'center',
   },
-  buttonText: {
+  actionButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginLeft: 8,
   },
   emptyText: {
     fontSize: 18,
     color: '#888',
+    marginTop: 10,
+  },
+  orderButton: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 30,
+    marginTop: 20,
+  },
+  orderButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
