@@ -1,26 +1,34 @@
 import axios from 'axios';
+import { getDBConnection } from './DatabaseService';
 import { API_BASE_URL } from '../apiConfig';
-import { getDBConnection, saveTables, saveMenu } from './DatabaseService';
 
-// Đồng bộ dữ liệu tĩnh (bàn, thực đơn) từ server về thiết bị
 export const syncStaticData = async () => {
+  console.log('Bắt đầu đồng bộ dữ liệu tĩnh...');
   try {
-    console.log('Bắt đầu đồng bộ dữ liệu tĩnh...');
     const db = await getDBConnection();
+    const response = await axios.get(`${API_BASE_URL}/api/menu`);
+    const menu = response.data;
 
-    // Đồng bộ danh sách bàn
-    const tablesResponse = await axios.get(`${API_BASE_URL}/api/tables`);
-    await saveTables(db, tablesResponse.data);
-    console.log('Đồng bộ danh sách bàn thành công.');
+    await db.transaction(async tx => {
+      await tx.executeSql('DELETE FROM dishes');
+      await tx.executeSql('DELETE FROM categories');
 
-    // Đồng bộ thực đơn
-    const menuResponse = await axios.get(`${API_BASE_URL}/api/menu`);
-    await saveMenu(db, menuResponse.data);
-    console.log('Đồng bộ thực đơn thành công.');
+      for (const category of menu) {
+        await tx.executeSql('INSERT INTO categories (id, name) VALUES (?, ?)', [
+          category.id,
+          category.name,
+        ]);
+        for (const dish of category.dishes) {
+          await tx.executeSql(
+            'INSERT INTO dishes (id, name, price, image, category_id) VALUES (?, ?, ?, ?, ?)',
+            [dish.id, dish.name, dish.price, dish.image, category.id],
+          );
+        }
+      }
+    });
 
-    console.log('Đồng bộ dữ liệu tĩnh hoàn tất.');
+    console.log('Đồng bộ thực đơn thành công!');
   } catch (error) {
-    console.error('Lỗi trong quá trình đồng bộ dữ liệu tĩnh:', error);
-    throw error;
+    console.error('Lỗi khi đồng bộ dữ liệu tĩnh:', error);
   }
 };

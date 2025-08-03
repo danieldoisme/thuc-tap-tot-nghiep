@@ -16,7 +16,7 @@ import { API_BASE_URL } from '../apiConfig';
 import Icon from '@react-native-vector-icons/ionicons';
 import DishItem from '../components/DishItem';
 import { useCart } from '../context/CartContext';
-import { getDBConnection, getLocalMenu } from '../services/DatabaseService';
+import { getDBConnection } from '../services/DatabaseService';
 
 const MenuScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
@@ -28,6 +28,37 @@ const MenuScreen = ({ route, navigation }) => {
   const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMenuFromLocalDB = async () => {
+      setLoading(true);
+      try {
+        const db = await getDBConnection();
+        const [results] = await db.executeSql('SELECT * FROM categories');
+        const categories = [];
+        for (let i = 0; i < results.rows.length; i++) {
+          const category = results.rows.item(i);
+          const [dishResults] = await db.executeSql(
+            'SELECT * FROM dishes WHERE category_id = ?',
+            [category.id],
+          );
+          const dishes = [];
+          for (let j = 0; j < dishResults.rows.length; j++) {
+            dishes.push(dishResults.rows.item(j));
+          }
+          categories.push({ ...category, dishes });
+        }
+        setMenu(categories);
+      } catch (error) {
+        console.error('Lỗi lấy thực đơn từ CSDL cục bộ', error);
+        Alert.alert('Lỗi', 'Không thể tải được thực đơn.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMenuFromLocalDB();
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({

@@ -1,24 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
-import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
+import NetInfo from '@react-native-community/netinfo';
 import AppNavigator from './src/navigation/AppNavigator';
 import { initDB } from './src/services/DatabaseService';
 import { syncStaticData } from './src/services/SyncService';
-import { processActionQueue } from './src/services/ActionQueueService';
-
-const AppContent = () => {
-  const netInfo = useNetInfo();
-
-  useEffect(() => {
-    // Khi có kết nối mạng và không phải lần đầu tiên kiểm tra
-    if (netInfo.isConnected === true) {
-      console.log('Có kết nối mạng, đang xử lý hàng đợi...');
-      processActionQueue();
-    }
-  }, [netInfo.isConnected]);
-
-  return <AppNavigator />;
-};
+import { CartProvider } from './src/context/CartContext';
 
 const App = () => {
   const [isReady, setIsReady] = useState(false);
@@ -28,14 +14,16 @@ const App = () => {
     const initializeApp = async () => {
       try {
         await initDB();
-        // Chỉ đồng bộ dữ liệu tĩnh khi có mạng
-        const state = await NetInfo.fetch();
-        if (state.isConnected) {
+
+        const netState = await NetInfo.fetch();
+        if (netState.isConnected) {
           await syncStaticData();
+        } else {
+          console.log('Không có mạng, sử dụng dữ liệu offline.');
         }
-      } catch (e) {
-        console.error('Lỗi khởi tạo ứng dụng:', e);
-        setError('Không thể khởi tạo dữ liệu. Vui lòng thử lại.');
+      } catch (e: any) {
+        console.error('Lỗi nghiêm trọng khi khởi tạo ứng dụng:', e);
+        setError('Không thể khởi tạo được ứng dụng.');
       } finally {
         setIsReady(true);
       }
@@ -47,14 +35,25 @@ const App = () => {
   if (!isReady) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#F9790E" />
-        <Text style={styles.loadingText}>Đang chuẩn bị dữ liệu...</Text>
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        <ActivityIndicator size="large" />
+        <Text>Đang khởi tạo dữ liệu...</Text>
       </View>
     );
   }
 
-  return <AppContent />;
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: 'red' }}>{error}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <CartProvider>
+      <AppNavigator />
+    </CartProvider>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -62,19 +61,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  errorText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: 'red',
-    paddingHorizontal: 20,
-    textAlign: 'center',
   },
 });
 

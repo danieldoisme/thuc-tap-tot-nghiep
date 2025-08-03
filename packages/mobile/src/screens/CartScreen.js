@@ -77,47 +77,22 @@ const CartScreen = ({ route, navigation }) => {
     }
     setIsLoading(true);
 
-    const orderData = {
-      tableId: tableId,
-      userId: user.userId,
-      items: items.map(item => ({
-        id: parseInt(item.id, 10),
-        quantity: item.quantity,
-        price: item.price,
-        notes: item.notes,
-      })),
-    };
-
     try {
-      if (netInfo.isConnected) {
-        await axios.post(`${API_BASE_URL}/api/orders`, orderData);
-        Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              clearCart();
-              navigation.popToTop();
-            },
-          },
-        ]);
-      } else {
-        await addOrderToActionQueue(orderData);
-        Alert.alert(
-          'Chế độ ngoại tuyến',
-          'Đơn hàng đã được lưu và sẽ được gửi khi có mạng.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                clearCart();
-                navigation.popToTop();
-              },
-            },
-          ],
-        );
-      }
+      const orderData = {
+        tableId: tableId,
+        userId: user.userId,
+        items: items.map(item => ({
+          id: parseInt(item.id, 10),
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+        })),
+      };
+      await axios.post(`${API_BASE_URL}/api/orders`, orderData);
+      Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!');
+      clearCart();
+      navigation.popToTop();
     } catch (error) {
-      // Xử lý lỗi nếu gọi API online thất bại
       console.error('Lỗi khi tạo đơn hàng:', error);
       Alert.alert('Lỗi', 'Không thể gửi đơn hàng. Vui lòng thử lại.');
     } finally {
