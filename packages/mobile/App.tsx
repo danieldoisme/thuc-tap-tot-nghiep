@@ -1,8 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import AppNavigator from './src/navigation/AppNavigator';
 import { initDB } from './src/services/DatabaseService';
 import { syncStaticData } from './src/services/SyncService';
+import { processActionQueue } from './src/services/ActionQueueService';
+
+const AppContent = () => {
+  const netInfo = useNetInfo();
+
+  useEffect(() => {
+    // Khi có kết nối mạng và không phải lần đầu tiên kiểm tra
+    if (netInfo.isConnected === true) {
+      console.log('Có kết nối mạng, đang xử lý hàng đợi...');
+      processActionQueue();
+    }
+  }, [netInfo.isConnected]);
+
+  return <AppNavigator />;
+};
 
 const App = () => {
   const [isReady, setIsReady] = useState(false);
@@ -12,7 +28,11 @@ const App = () => {
     const initializeApp = async () => {
       try {
         await initDB();
-        await syncStaticData();
+        // Chỉ đồng bộ dữ liệu tĩnh khi có mạng
+        const state = await NetInfo.fetch();
+        if (state.isConnected) {
+          await syncStaticData();
+        }
       } catch (e) {
         console.error('Lỗi khởi tạo ứng dụng:', e);
         setError('Không thể khởi tạo dữ liệu. Vui lòng thử lại.');
@@ -34,7 +54,7 @@ const App = () => {
     );
   }
 
-  return <AppNavigator />;
+  return <AppContent />;
 };
 
 const styles = StyleSheet.create({

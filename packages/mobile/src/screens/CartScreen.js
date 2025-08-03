@@ -14,10 +14,13 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import CartItem from '../components/CartItem';
 import { useCart } from '../context/CartContext';
+import { addOrderToActionQueue } from '../services/ActionQueueService';
+import { useNetInfo } from '@react-native-community/netinfo';
 
 const CartScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { cart: items, setCart, clearCart } = useCart();
+  const netInfo = useNetInfo();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -73,6 +76,7 @@ const CartScreen = ({ route, navigation }) => {
       return;
     }
     setIsLoading(true);
+
     const orderData = {
       tableId: tableId,
       userId: user.userId,
@@ -85,17 +89,35 @@ const CartScreen = ({ route, navigation }) => {
     };
 
     try {
-      await axios.post(`${API_BASE_URL}/api/orders`, orderData);
-      Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            clearCart();
-            navigation.pop(2);
+      if (netInfo.isConnected) {
+        await axios.post(`${API_BASE_URL}/api/orders`, orderData);
+        Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              clearCart();
+              navigation.popToTop();
+            },
           },
-        },
-      ]);
+        ]);
+      } else {
+        await addOrderToActionQueue(orderData);
+        Alert.alert(
+          'Chế độ ngoại tuyến',
+          'Đơn hàng đã được lưu và sẽ được gửi khi có mạng.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                clearCart();
+                navigation.popToTop();
+              },
+            },
+          ],
+        );
+      }
     } catch (error) {
+      // Xử lý lỗi nếu gọi API online thất bại
       console.error('Lỗi khi tạo đơn hàng:', error);
       Alert.alert('Lỗi', 'Không thể gửi đơn hàng. Vui lòng thử lại.');
     } finally {

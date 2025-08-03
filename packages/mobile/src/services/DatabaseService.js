@@ -43,42 +43,43 @@ export const createTables = async db => {
         FOREIGN KEY (CategoryID) REFERENCES categories(CategoryID)
     );`;
 
-  // Bảng Orders - Thêm cột temp_id để quản lý khi offline
+  // Bảng Orders
   const orderTableQuery = `
-    CREATE TABLE IF NOT EXISTS orders (
-        OrderID INTEGER,
-        TableID INTEGER NOT NULL,
-        UserID INTEGER NOT NULL,
-        OrderTime TEXT,
-        TotalAmount REAL,
-        Status TEXT DEFAULT 'chờ thanh toán',
-        temp_id TEXT UNIQUE,
-        sync_status TEXT DEFAULT 'synced'
-    );`;
+  CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER UNIQUE,
+      temp_id TEXT UNIQUE NOT NULL,
+      table_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      order_time TEXT NOT NULL,
+      total_amount REAL,
+      status TEXT DEFAULT 'chờ thanh toán',
+      sync_status TEXT NOT NULL DEFAULT 'synced'
+  );`;
 
-  // Bảng Order_Items - Thêm cột temp_id
+  // Bảng Order_Items
   const orderItemTableQuery = `
-    CREATE TABLE IF NOT EXISTS order_items (
-        OrderItemID INTEGER,
-        OrderID INTEGER,
-        DishID INTEGER NOT NULL,
-        Quantity INTEGER NOT NULL,
-        Price REAL NOT NULL,
-        Notes TEXT,
-        Status TEXT DEFAULT 'đang chế biến',
-        order_temp_id TEXT,
-        sync_status TEXT DEFAULT 'synced'
-    );`;
+  CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER UNIQUE,
+      order_temp_id TEXT NOT NULL,
+      dish_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL,
+      price REAL NOT NULL,
+      notes TEXT,
+      status TEXT DEFAULT 'đang chế biến'
+  );`;
 
   // Bảng hàng đợi hành động
   const actionQueueQuery = `
-    CREATE TABLE IF NOT EXISTS action_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        attempts INTEGER DEFAULT 0
-    );`;
+  CREATE TABLE IF NOT EXISTS action_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      endpoint TEXT NOT NULL,
+      method TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      attempts INTEGER DEFAULT 0
+  );`;
 
   try {
     await db.executeSql(userTableQuery);
