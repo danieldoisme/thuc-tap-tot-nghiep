@@ -12,11 +12,11 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import Icon from '@react-native-vector-icons/ionicons';
 import DishItem from '../components/DishItem';
 import { useCart } from '../context/CartContext';
+import { getDBConnection, getLocalMenu } from '../services/DatabaseService';
 
 const MenuScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
@@ -28,9 +28,6 @@ const MenuScreen = ({ route, navigation }) => {
   const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(true);
-  const [allDishes, setAllDishes] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(0);
 
   useEffect(() => {
     navigation.setOptions({
@@ -70,8 +67,8 @@ const MenuScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchMenuData = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/menu`);
-        const menuData = response.data;
+        const db = await getDBConnection();
+        const menuData = await getLocalMenu(db);
 
         const desiredOrder = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống'];
 
@@ -95,7 +92,7 @@ const MenuScreen = ({ route, navigation }) => {
           const dishes = category.dishes.map(dish => ({
             id: dish.DishID,
             name: dish.DishName,
-            price: parseInt(dish.Price),
+            price: dish.Price,
             image: dish.ImageURL ? `${API_BASE_URL}/${dish.ImageURL}` : null,
             description: dish.Description,
             categoryId: category.CategoryID,

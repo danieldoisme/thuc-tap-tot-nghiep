@@ -8,14 +8,12 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
-import axios from 'axios';
-import { API_BASE_URL } from '../apiConfig';
-import io from 'socket.io-client';
+import { API_BASE_URL, socket } from '../apiConfig';
+import { getDBConnection, getLocalTables } from '../services/DatabaseService';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@react-native-vector-icons/ionicons';
-
-const socket = io(API_BASE_URL);
 
 const TableIcon = ({ isOccupied }) => {
   const squareColor = isOccupied ? '#F9790E' : '#E0E0E0';
@@ -60,8 +58,10 @@ const TableListScreen = ({ navigation, route }) => {
   const fetchTables = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/tables`);
-      const formattedData = response.data.map(table => ({
+      const db = await getDBConnection();
+      const localTables = await getLocalTables(db);
+
+      const formattedData = localTables.map(table => ({
         id: table.TableID.toString(),
         name: table.TableName,
         status: table.Status,
@@ -69,6 +69,7 @@ const TableListScreen = ({ navigation, route }) => {
       setTables(formattedData);
     } catch (error) {
       console.error('Lỗi khi tải danh sách bàn:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách bàn.');
     } finally {
       setLoading(false);
     }

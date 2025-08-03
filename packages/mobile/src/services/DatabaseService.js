@@ -154,3 +154,57 @@ export const saveMenu = async (db, menu) => {
     });
   });
 };
+
+// Hàm lấy danh sách tất cả các bàn từ CSDL cục bộ
+export const getLocalTables = async db => {
+  try {
+    const tables = [];
+    const results = await db.executeSql('SELECT * FROM tables;');
+    results.forEach(result => {
+      for (let i = 0; i < result.rows.length; i++) {
+        tables.push(result.rows.item(i));
+      }
+    });
+    return tables;
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách bàn từ CSDL cục bộ:', error);
+    throw error;
+  }
+};
+
+// Hàm lấy thực đơn từ CSDL cục bộ
+export const getLocalMenu = async db => {
+  try {
+    const menu = [];
+    const categories = [];
+    // Lấy tất cả danh mục
+    const catResults = await db.executeSql('SELECT * FROM categories;');
+    catResults.forEach(result => {
+      for (let i = 0; i < result.rows.length; i++) {
+        categories.push(result.rows.item(i));
+      }
+    });
+
+    // Lấy tất cả món ăn
+    const dishes = [];
+    const dishResults = await db.executeSql('SELECT * FROM dishes;');
+    dishResults.forEach(result => {
+      for (let i = 0; i < result.rows.length; i++) {
+        dishes.push(result.rows.item(i));
+      }
+    });
+
+    // Ghép món ăn vào danh mục tương ứng
+    categories.forEach(category => {
+      menu.push({
+        ...category,
+        dishes: dishes.filter(d => d.CategoryID === category.CategoryID),
+      });
+    });
+
+    return menu;
+  } catch (error) {
+    console.error('Lỗi khi lấy thực đơn từ CSDL cục bộ:', error);
+    throw error;
+  }
+};
