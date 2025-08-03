@@ -14,13 +14,10 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import CartItem from '../components/CartItem';
 import { useCart } from '../context/CartContext';
-import { addOrderToActionQueue } from '../services/ActionQueueService';
-import { useNetInfo } from '@react-native-community/netinfo';
 
 const CartScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { cart: items, setCart, clearCart } = useCart();
-  const netInfo = useNetInfo();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -76,22 +73,28 @@ const CartScreen = ({ route, navigation }) => {
       return;
     }
     setIsLoading(true);
+    const orderData = {
+      tableId: tableId,
+      userId: user.userId,
+      items: items.map(item => ({
+        id: parseInt(item.id, 10),
+        quantity: item.quantity,
+        price: item.price,
+        notes: item.notes,
+      })),
+    };
 
     try {
-      const orderData = {
-        tableId: tableId,
-        userId: user.userId,
-        items: items.map(item => ({
-          id: parseInt(item.id, 10),
-          quantity: item.quantity,
-          price: item.price,
-          notes: item.notes,
-        })),
-      };
       await axios.post(`${API_BASE_URL}/api/orders`, orderData);
-      Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!');
-      clearCart();
-      navigation.popToTop();
+      Alert.alert('Thành công', 'Đã gửi đơn hàng đến nhà bếp!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            clearCart();
+            navigation.pop(2);
+          },
+        },
+      ]);
     } catch (error) {
       console.error('Lỗi khi tạo đơn hàng:', error);
       Alert.alert('Lỗi', 'Không thể gửi đơn hàng. Vui lòng thử lại.');

@@ -8,93 +8,51 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Alert,
+  Button,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import axios from 'axios';
+import { API_BASE_URL } from '../apiConfig';
 import Icon from '@react-native-vector-icons/ionicons';
 import DishItem from '../components/DishItem';
 import { useCart } from '../context/CartContext';
-import { getDBConnection } from '../services/DatabaseService';
-import { API_BASE_URL } from '../apiConfig'; // Để lấy đường dẫn ảnh
 
 const MenuScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { cart, setCart } = useCart();
 
-  // State cho modal thêm món
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
-  // State cho dữ liệu
   const [loading, setLoading] = useState(true);
-  const [menu, setMenu] = useState([]); // State duy nhất cho menu
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [allDishes, setAllDishes] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(0);
 
-  // Lấy dữ liệu từ CSDL cục bộ khi màn hình được mở
-  useEffect(() => {
-    const fetchMenuFromLocalDB = async () => {
-      setLoading(true);
-      try {
-        const db = await getDBConnection();
-        // Lấy danh sách các danh mục
-        const [categoryResults] = await db.executeSql(
-          'SELECT * FROM categories',
-        );
-        const categoriesFromDB = [];
-        for (let i = 0; i < categoryResults.rows.length; i++) {
-          categoriesFromDB.push(categoryResults.rows.item(i));
-        }
-
-        // Lấy tất cả các món ăn
-        const [dishResults] = await db.executeSql('SELECT * FROM dishes');
-        const dishesFromDB = [];
-        for (let i = 0; i < dishResults.rows.length; i++) {
-          dishesFromDB.push(dishResults.rows.item(i));
-        }
-
-        // Sắp xếp thứ tự ưu tiên cho danh mục
-        const desiredOrder = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống'];
-        categoriesFromDB.sort((a, b) => {
-          const indexA = desiredOrder.indexOf(a.name);
-          const indexB = desiredOrder.indexOf(b.name);
-          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-          if (indexA !== -1) return -1;
-          if (indexB !== -1) return 1;
-          return a.name.localeCompare(b.name);
-        });
-
-        // Gộp món ăn vào từng danh mục tương ứng
-        const fullMenu = categoriesFromDB.map(category => ({
-          ...category,
-          dishes: dishesFromDB.filter(dish => dish.category_id === category.id),
-        }));
-
-        setMenu(fullMenu);
-        if (fullMenu.length > 0) {
-          setSelectedCategoryId(fullMenu[0].id); // Chọn danh mục đầu tiên làm mặc định
-        }
-      } catch (error) {
-        console.error('Lỗi lấy thực đơn từ CSDL cục bộ', error);
-        Alert.alert('Lỗi', 'Không thể tải được thực đơn.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMenuFromLocalDB();
-  }, []);
-
-  // Cập nhật header của navigation
   useEffect(() => {
     navigation.setOptions({
       title: tableName,
+      headerStyle: {
+        backgroundColor: '#F9790E',
+      },
+      headerTintColor: '#fff',
+      headerTitleStyle: {
+        fontWeight: 'bold',
+        fontSize: 22,
+      },
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
       headerRight: () => (
         <TouchableOpacity
           onPress={() =>
-            navigation.navigate('Cart', { tableId, tableName, user })
+            navigation.navigate('Cart', {
+              tableId: tableId,
+              tableName: tableName,
+              user: user,
+            })
           }
           style={styles.cartIconContainer}
         >
@@ -107,18 +65,68 @@ const MenuScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, tableName, cart, tableId, user]);
+  }, [navigation, tableName, cart]);
 
-  // Hàm xử lý khi nhấn nút "Thêm" món ăn
-  const handleOpenModal = dish => {
+  useEffect(() => {
+    const fetchMenuData = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/menu`);
+        const menuData = response.data;
+
+        const desiredOrder = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống'];
+
+        const sortedMenuData = [...menuData].sort((a, b) => {
+          const indexA = desiredOrder.indexOf(a.CategoryName);
+          const indexB = desiredOrder.indexOf(b.CategoryName);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
+          return a.CategoryName.localeCompare(b.CategoryName);
+        });
+
+        const apiCategories = sortedMenuData.map(cat => ({
+          id: cat.CategoryID,
+          name: cat.CategoryName,
+        }));
+        setCategories([{ id: 0, name: 'Tất cả' }, ...apiCategories]);
+
+        let allDishesFromApi = [];
+        sortedMenuData.forEach(category => {
+          const dishes = category.dishes.map(dish => ({
+            id: dish.DishID,
+            name: dish.DishName,
+            price: parseInt(dish.Price),
+            image: dish.ImageURL ? `${API_BASE_URL}/${dish.ImageURL}` : null,
+            description: dish.Description,
+            categoryId: category.CategoryID,
+          }));
+          allDishesFromApi = [...allDishesFromApi, ...dishes];
+        });
+        setAllDishes(allDishesFromApi);
+      } catch (error) {
+        console.error('Lỗi khi tải thực đơn:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenuData();
+  }, []);
+
+  const getFilteredDishes = () => {
+    if (selectedCategoryId === 0) {
+      return allDishes;
+    }
+    return allDishes.filter(dish => dish.categoryId === selectedCategoryId);
+  };
+
+  const handleAddToCart = dish => {
     setSelectedDish(dish);
     setQuantity(1);
     setNotes('');
     setModalVisible(true);
   };
 
-  // Hàm xử lý khi xác nhận thêm món từ modal
-  const handleConfirmAddToCart = () => {
+  const confirmAddToCart = () => {
     if (!selectedDish) return;
 
     setCart(currentCart => {
@@ -127,12 +135,10 @@ const MenuScreen = ({ route, navigation }) => {
       );
 
       if (existingItemIndex > -1) {
-        // Nếu món đã có và ghi chú giống hệt -> tăng số lượng
         const updatedCart = [...currentCart];
         updatedCart[existingItemIndex].quantity += quantity;
         return updatedCart;
       } else {
-        // Nếu là món mới hoặc ghi chú khác -> thêm mới vào giỏ hàng
         const newCartItem = {
           id: selectedDish.id,
           name: selectedDish.name,
@@ -148,18 +154,32 @@ const MenuScreen = ({ route, navigation }) => {
     setModalVisible(false);
   };
 
-  // Lấy danh sách món ăn đã được lọc theo danh mục đang chọn
-  const getFilteredDishes = () => {
-    if (!selectedCategoryId) {
-      return [];
-    }
-    const selectedCategory = menu.find(cat => cat.id === selectedCategoryId);
-    return selectedCategory ? selectedCategory.dishes : [];
-  };
+  const renderCategoryItem = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryItem,
+        selectedCategoryId === item.id && styles.categoryItemSelected,
+      ]}
+      onPress={() => setSelectedCategoryId(item.id)}
+    >
+      <Text
+        style={[
+          styles.categoryText,
+          selectedCategoryId === item.id && styles.categoryTextSelected,
+        ]}
+      >
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderDishItem = ({ item }) => (
+    <DishItem item={item} onAddToCart={handleAddToCart} />
+  );
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color="#F9790E" />
       </SafeAreaView>
     );
@@ -167,102 +187,72 @@ const MenuScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Danh sách danh mục */}
       <View style={styles.categoriesContainer}>
         <FlatList
-          data={menu}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.categoryItem,
-                selectedCategoryId === item.id && styles.categoryItemSelected,
-              ]}
-              onPress={() => setSelectedCategoryId(item.id)}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategoryId === item.id && styles.categoryTextSelected,
-                ]}
-              >
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
+          data={categories}
+          renderItem={renderCategoryItem}
           keyExtractor={item => item.id.toString()}
           horizontal
           showsHorizontalScrollIndicator={false}
         />
       </View>
 
-      {/* Lưới các món ăn */}
       <FlatList
         data={getFilteredDishes()}
-        renderItem={({ item }) => (
-          <DishItem
-            item={{
-              ...item,
-              image: item.image ? `${API_BASE_URL}/${item.image}` : null,
-            }}
-            onAddToCart={handleOpenModal}
-          />
-        )}
+        renderItem={renderDishItem}
         keyExtractor={item => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.listContentContainer}
       />
 
-      {/* Modal để thêm món ăn */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={isModalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setModalVisible(false)}
+        >
+          <View style={styles.modalView}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedDish?.name}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Icon name="close-circle" size={30} color="#888" />
-              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Số lượng</Text>
+              <View style={styles.quantitySelector}>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                >
+                  <Icon name="remove-outline" size={24} color="#888" />
+                </TouchableOpacity>
+                <Text style={styles.quantityText}>{quantity}</Text>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() => setQuantity(q => q + 1)}
+                >
+                  <Icon name="add-outline" size={24} color="#888" />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <Text style={styles.modalLabel}>Số lượng</Text>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                style={styles.quantityButton}
-              >
-                <Icon name="remove-circle-outline" size={32} color="#F9790E" />
-              </TouchableOpacity>
-              <Text style={styles.quantityText}>{quantity}</Text>
-              <TouchableOpacity
-                onPress={() => setQuantity(quantity + 1)}
-                style={styles.quantityButton}
-              >
-                <Icon name="add-circle-outline" size={32} color="#F9790E" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalLabel}>Ghi chú</Text>
             <TextInput
               style={styles.notesInput}
-              onChangeText={setNotes}
+              placeholder="Ghi chú"
+              placeholderTextColor="#aaa"
               value={notes}
-              placeholder="VD: Ít cay, không hành..."
+              onChangeText={setNotes}
+              multiline
             />
+
             <TouchableOpacity
               style={styles.confirmButton}
-              onPress={handleConfirmAddToCart}
+              onPress={confirmAddToCart}
             >
-              <Text style={styles.confirmButtonText}>
-                Thêm vào giỏ -{' '}
-                {(selectedDish?.price * quantity).toLocaleString('vi-VN')} VNĐ
-              </Text>
+              <Text style={styles.confirmButtonText}>Thêm</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -274,6 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -283,9 +274,9 @@ const styles = StyleSheet.create({
   },
   cartBadge: {
     position: 'absolute',
-    right: -5,
-    top: -5,
-    backgroundColor: 'red',
+    right: 0,
+    top: 0,
+    backgroundColor: 'white',
     borderRadius: 10,
     width: 20,
     height: 20,
@@ -293,47 +284,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cartBadgeText: {
-    color: 'white',
+    color: '#F9790E',
     fontSize: 12,
     fontWeight: 'bold',
   },
   categoriesContainer: {
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   categoryItem: {
-    paddingHorizontal: 20,
     paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   categoryItemSelected: {
-    backgroundColor: '#F9790E',
+    borderBottomColor: '#F9790E',
   },
   categoryText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    color: '#888',
   },
   categoryTextSelected: {
-    color: '#fff',
+    color: '#F9790E',
+    fontWeight: 'bold',
   },
   listContentContainer: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 8,
+    paddingBottom: 20,
+    paddingTop: 10,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalContainer: {
+  modalView: {
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    paddingBottom: 30, // Thêm padding cho an toàn
+    paddingBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -346,47 +349,45 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  modalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  quantityContainer: {
+  quantitySelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   quantityButton: {
-    padding: 10,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
   },
   quantityText: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginHorizontal: 20,
-    minWidth: 40,
+    color: '#333',
+    marginHorizontal: 15,
+    minWidth: 30,
     textAlign: 'center',
   },
   notesInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    height: 80,
+    backgroundColor: '#f7f7f7',
+    borderRadius: 10,
+    padding: 15,
+    minHeight: 80,
     textAlignVertical: 'top',
+    fontSize: 16,
+    marginBottom: 20,
   },
   confirmButton: {
     backgroundColor: '#F9790E',
-    padding: 15,
-    borderRadius: 10,
+    paddingVertical: 15,
+    borderRadius: 30,
     alignItems: 'center',
-    marginTop: 20,
   },
   confirmButtonText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 18,
   },
 });
 
