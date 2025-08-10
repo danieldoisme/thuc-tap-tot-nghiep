@@ -11,6 +11,9 @@ import {
   Button,
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
@@ -216,42 +219,48 @@ const MenuScreen = ({ route, navigation }) => {
           activeOpacity={1}
           onPressOut={() => setModalVisible(false)}
         >
-          <View style={styles.modalView}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Số lượng</Text>
-              <View style={styles.quantitySelector}>
+          <TouchableWithoutFeedback>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+              <View style={styles.modalView}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Số lượng</Text>
+                  <View style={styles.quantitySelector}>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                    >
+                      <Icon name="remove-outline" size={24} color="#888" />
+                    </TouchableOpacity>
+                    <Text style={styles.quantityText}>{quantity}</Text>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => setQuantity(q => q + 1)}
+                    >
+                      <Icon name="add-outline" size={24} color="#888" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TextInput
+                  style={styles.notesInput}
+                  placeholder="Ghi chú"
+                  placeholderTextColor="#aaa"
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                />
+
                 <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                  style={styles.confirmButton}
+                  onPress={confirmAddToCart}
                 >
-                  <Icon name="remove-outline" size={24} color="#888" />
-                </TouchableOpacity>
-                <Text style={styles.quantityText}>{quantity}</Text>
-                <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => setQuantity(q => q + 1)}
-                >
-                  <Icon name="add-outline" size={24} color="#888" />
+                  <Text style={styles.confirmButtonText}>Thêm</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
-            <TextInput
-              style={styles.notesInput}
-              placeholder="Ghi chú"
-              placeholderTextColor="#aaa"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-            />
-
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={confirmAddToCart}
-            >
-              <Text style={styles.confirmButtonText}>Thêm</Text>
-            </TouchableOpacity>
-          </View>
+            </KeyboardAvoidingView>
+          </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
