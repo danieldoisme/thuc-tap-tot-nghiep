@@ -64,11 +64,12 @@ class DatabaseService {
           DishName TEXT NOT NULL, 
           Price REAL NOT NULL, 
           ImageURL TEXT, 
+          LocalImageURL TEXT,
           CategoryID INTEGER
         );
       `);
 
-      // Orders Table (Offline Version)
+      // Orders Table
       tx.executeSql(`
         CREATE TABLE IF NOT EXISTS orders (
           ClientOrderID TEXT PRIMARY KEY,
@@ -80,15 +81,17 @@ class DatabaseService {
           VAT_Percentage REAL,
           VAT_Amount REAL,
           TotalAmount REAL,
-          Status TEXT
+          Status TEXT, -- Business status ('chờ thanh toán', etc.)
+          SyncStatus TEXT -- Sync status ('synced', 'pending_create')
         );
       `);
 
-      // Order Items Table (Offline Version)
+      // Order Items Table
       tx.executeSql(`
         CREATE TABLE IF NOT EXISTS order_items (
           OrderItemID INTEGER PRIMARY KEY AUTOINCREMENT,
           ClientOrderID TEXT,
+          ServerOrderItemID INTEGER,
           DishID INTEGER,
           Quantity INTEGER NOT NULL,
           Price REAL NOT NULL,
@@ -147,12 +150,13 @@ class DatabaseService {
     await db.transaction(tx => {
       dishes.forEach(dish => {
         tx.executeSql(
-          'INSERT OR REPLACE INTO dishes (DishID, DishName, Price, ImageURL, CategoryID) VALUES (?, ?, ?, ?, ?);',
+          'INSERT OR REPLACE INTO dishes (DishID, DishName, Price, ImageURL, LocalImageURL, CategoryID) VALUES (?, ?, ?, ?, ?, ?);',
           [
             dish.DishID,
             dish.DishName,
             dish.Price,
             dish.ImageURL,
+            dish.LocalImageURL,
             dish.CategoryID,
           ],
         );
@@ -171,13 +175,66 @@ class DatabaseService {
     console.log(`Updated status for TableID ${tableId} to ${status}`);
   }
 
-  async updateLocalOrderAfterSync(clientOrderId, serverOrderId) {
+  async updateLocalOrderAfterSync(clientOrderId, serverOrderId, status) {
     await this.executeSql(
       'UPDATE orders SET ServerOrderID = ?, Status = ? WHERE ClientOrderID = ?;',
-      [serverOrderId, 'synced', clientOrderId],
+      [serverOrderId, status, clientOrderId],
     );
     console.log(
-      `Synced local order ${clientOrderId} with ServerOrderID ${serverOrderId}`,
+      `Synced local order ${clientOrderId} with ServerOrderID ${serverOrderId} and Status ${status}`,
+    );
+  }
+
+  async syncOrderDetails(order, items) {
+    if (!order || !items) return;
+
+    const db = await this.open();
+    await db.transaction(tx => {
+      const clientOrderId =
+        order.ClientOrderID || `client-online-${order.OrderID}`;
+
+      tx.executeSql(
+        `INSERT OR REPLACE INTO orders (ServerOrderID, ClientOrderID, TableID, UserID, OrderTime, SubTotal, VAT_Percentage, VAT_Amount, TotalAmount, Status, SyncStatus) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          order.OrderID,
+          clientOrderId,
+          order.TableID,
+          order.UserID,
+          order.OrderTime,
+          order.SubTotal,
+          order.VAT_Percentage,
+          order.VAT_Amount,
+          order.TotalAmount,
+          order.Status,
+          'synced',
+        ],
+      );
+
+      // Delete old items for this order
+      tx.executeSql('DELETE FROM order_items WHERE ClientOrderID = ?;', [
+        clientOrderId,
+      ]);
+
+      // Insert the fresh list of items with their individual statuses
+      items.forEach(item => {
+        tx.executeSql(
+          `INSERT INTO order_items (ClientOrderID, ServerOrderItemID, DishID, Quantity, Price, Notes, Status) 
+           VALUES (?, ?, ?, ?, ?, ?, ?);`,
+          [
+            clientOrderId,
+            item.OrderItemID,
+            item.DishID,
+            item.Quantity,
+            item.Price,
+            item.Notes,
+            item.Status,
+          ],
+        );
+      });
+    });
+    console.log(
+      `Successfully synced details for OrderID ${order.OrderID} to local DB.`,
     );
   }
 }

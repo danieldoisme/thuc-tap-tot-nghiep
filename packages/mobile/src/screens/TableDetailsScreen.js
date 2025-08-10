@@ -15,10 +15,13 @@ import { API_BASE_URL, socket } from '../apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '@react-native-vector-icons/ionicons';
 import { useCart } from '../context/CartContext';
+import { useNetwork } from '../context/NetworkContext';
+import { databaseService } from '../services/DatabaseService';
 
 const TableDetailsScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { clearCart } = useCart();
+  const { isConnected } = useNetwork();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,47 +48,93 @@ const TableDetailsScreen = ({ route, navigation }) => {
     });
   }, [navigation, tableName]);
 
+  const formatOrderItems = items => {
+    const formatted = items.map(item => ({
+      id: item.OrderItemID,
+      name: item.DishName,
+      quantity: item.Quantity,
+      price: parseInt(item.Price),
+      status: item.Status,
+      notes: item.Notes,
+      imageUrl:
+        item.LocalImageURL ||
+        (item.ImageURL ? `${API_BASE_URL}/${item.ImageURL}` : null),
+    }));
+
+    const statusPriority = {
+      'đã hoàn thành': 1,
+      'đang chế biến': 2,
+      'đã phục vụ': 3,
+    };
+    formatted.sort(
+      (a, b) =>
+        (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99),
+    );
+    return formatted;
+  };
+
   const fetchOrderDetails = useCallback(async () => {
+    setLoading(true);
+    // Load from local DB first
     try {
-      setLoading(true);
+      const [orderResult] = await databaseService.executeSql(
+        "SELECT * FROM orders WHERE TableID = ? AND Status = 'chờ thanh toán' ORDER BY OrderTime DESC LIMIT 1;",
+        [tableId],
+      );
+
+      if (orderResult.rows.length > 0) {
+        const localOrder = orderResult.rows.item(0);
+        const clientOrderId = localOrder.ClientOrderID;
+
+        const [itemsResult] = await databaseService.executeSql(
+          `SELECT oi.*, d.DishName, d.ImageURL, d.LocalImageURL 
+           FROM order_items oi 
+           JOIN dishes d ON oi.DishID = d.DishID 
+           WHERE oi.ClientOrderID = ?;`,
+          [clientOrderId],
+        );
+
+        const localItems = [];
+        for (let i = 0; i < itemsResult.rows.length; i++) {
+          localItems.push(itemsResult.rows.item(i));
+        }
+
+        setOrder({ ...localOrder, items: formatOrderItems(localItems) });
+      } else {
+        setOrder(null);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải chi tiết bàn ăn từ dữ liệu cục bộ:', error);
+    } finally {
+      setLoading(false);
+    }
+
+    // If online, fetch from network
+    if (!isConnected) {
+      console.log('Device is offline. Using local order details.');
+      return;
+    }
+
+    try {
       const response = await axios.get(
         `${API_BASE_URL}/api/orders/table/${tableId}`,
       );
       const { order: orderInfo, items: orderItems } = response.data;
       if (orderInfo) {
-        const formattedItems = orderItems.map(item => ({
-          id: item.OrderItemID,
-          name: item.DishName,
-          quantity: item.Quantity,
-          price: parseInt(item.Price),
-          status: item.Status,
-          notes: item.Notes,
-          imageUrl: item.ImageURL ? `${API_BASE_URL}/${item.ImageURL}` : null,
-        }));
+        setOrder({ ...orderInfo, items: formatOrderItems(orderItems) });
 
-        const statusPriority = {
-          'đã hoàn thành': 1,
-          'đang chế biến': 2,
-          'đã phục vụ': 3,
-        };
-
-        formattedItems.sort((a, b) => {
-          const priorityA = statusPriority[a.status] || 99;
-          const priorityB = statusPriority[b.status] || 99;
-          return priorityA - priorityB;
-        });
-
-        setOrder({ ...orderInfo, items: formattedItems });
+        await databaseService.syncOrderDetails(orderInfo, orderItems);
       } else {
         setOrder(null);
+        await databaseService.executeSql(
+          "DELETE FROM orders WHERE TableID = ? AND Status = 'chờ thanh toán'",
+          [tableId],
+        );
       }
     } catch (error) {
       console.error(`Lỗi khi tải chi tiết bàn ${tableId}:`, error);
-      Alert.alert('Lỗi', 'Không thể tải dữ liệu của bàn.');
-    } finally {
-      setLoading(false);
     }
-  }, [tableId]);
+  }, [tableId, isConnected]);
 
   useFocusEffect(
     useCallback(() => {

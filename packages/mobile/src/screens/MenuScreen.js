@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Button,
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -19,12 +17,14 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import Icon from '@react-native-vector-icons/ionicons';
 import DishItem from '../components/DishItem';
-import databaseService from '../services/databaseService';
+import { databaseService } from '../services/DatabaseService';
 import { useCart } from '../context/CartContext';
+import { useNetwork } from '../context/NetworkContext';
 
 const MenuScreen = ({ route, navigation }) => {
   const { tableId, tableName, user } = route.params;
   const { cart, setCart } = useCart();
+  const { isConnected } = useNetwork();
 
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedDish, setSelectedDish] = useState(null);
@@ -39,14 +39,9 @@ const MenuScreen = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       title: tableName,
-      headerStyle: {
-        backgroundColor: '#F9790E',
-      },
+      headerStyle: { backgroundColor: '#F9790E' },
       headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-        fontSize: 22,
-      },
+      headerTitleStyle: { fontWeight: 'bold', fontSize: 22 },
       headerTitleAlign: 'center',
       headerShadowVisible: false,
       headerRight: () => (
@@ -69,57 +64,104 @@ const MenuScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, tableName, cart]);
+  }, [navigation, tableName, cart, tableId, user]);
+
+  const processMenuData = menuData => {
+    const desiredOrder = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống'];
+    const sortedMenuData = [...menuData].sort((a, b) => {
+      const indexA = desiredOrder.indexOf(a.CategoryName);
+      const indexB = desiredOrder.indexOf(b.CategoryName);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return a.CategoryName.localeCompare(b.CategoryName);
+    });
+
+    const apiCategories = sortedMenuData.map(cat => ({
+      id: cat.CategoryID,
+      name: cat.CategoryName,
+    }));
+
+    const allDishesFromApi = sortedMenuData.flatMap(category =>
+      category.dishes.map(dish => ({
+        ...dish,
+        id: dish.DishID,
+        name: dish.DishName,
+        price: parseInt(dish.Price),
+        image:
+          dish.LocalImageURL ||
+          (dish.ImageURL ? `${API_BASE_URL}/${dish.ImageURL}` : null),
+        categoryId: category.CategoryID,
+      })),
+    );
+    return { apiCategories, allDishesFromApi };
+  };
+
+  const fetchMenu = useCallback(async () => {
+    try {
+      console.log('Loading menu from local DB...');
+      const [categoriesResult] = await databaseService.executeSql(
+        'SELECT * FROM categories;',
+      );
+      const [dishesResult] = await databaseService.executeSql(
+        'SELECT * FROM dishes;',
+      );
+
+      const localCategories = [];
+      for (let i = 0; i < categoriesResult.rows.length; i++) {
+        localCategories.push(categoriesResult.rows.item(i));
+      }
+
+      const localDishes = [];
+      for (let i = 0; i < dishesResult.rows.length; i++) {
+        localDishes.push(dishesResult.rows.item(i));
+      }
+
+      const localMenuData = localCategories.map(category => ({
+        ...category,
+        dishes: localDishes.filter(
+          dish => dish.CategoryID === category.CategoryID,
+        ),
+      }));
+
+      const { apiCategories, allDishesFromApi } =
+        processMenuData(localMenuData);
+      setCategories([{ id: 0, name: 'Tất cả' }, ...apiCategories]);
+      setAllDishes(allDishesFromApi);
+    } catch (error) {
+      console.error('Failed to load menu from local DB:', error);
+    } finally {
+      setLoading(false);
+    }
+
+    // If online, fetch from network and merge
+    if (!isConnected) {
+      console.log('Device is offline. Using local menu data.');
+      return;
+    }
+
+    try {
+      console.log('Fetching menu from network...');
+      const response = await axios.get(`${API_BASE_URL}/api/menu`);
+      const networkMenuData = response.data;
+
+      const { apiCategories, allDishesFromApi } =
+        processMenuData(networkMenuData);
+      setCategories([{ id: 0, name: 'Tất cả' }, ...apiCategories]);
+      setAllDishes(allDishesFromApi);
+
+      console.log('Menu displayed with network data.');
+    } catch (error) {
+      console.error('Lỗi khi lấy thực đơn từ API, dùng dữ liệu cục bộ.', error);
+    }
+  }, [isConnected]);
 
   useEffect(() => {
-    const fetchMenuData = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api/menu`);
-        const menuData = response.data;
-
-        const desiredOrder = ['Khai vị', 'Món chính', 'Tráng miệng', 'Đồ uống'];
-
-        const sortedMenuData = [...menuData].sort((a, b) => {
-          const indexA = desiredOrder.indexOf(a.CategoryName);
-          const indexB = desiredOrder.indexOf(b.CategoryName);
-          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-          if (indexA !== -1) return -1;
-          if (indexB !== -1) return 1;
-          return a.CategoryName.localeCompare(b.CategoryName);
-        });
-
-        const apiCategories = sortedMenuData.map(cat => ({
-          id: cat.CategoryID,
-          name: cat.CategoryName,
-        }));
-        setCategories([{ id: 0, name: 'Tất cả' }, ...apiCategories]);
-
-        let allDishesFromApi = [];
-        sortedMenuData.forEach(category => {
-          const dishes = category.dishes.map(dish => ({
-            id: dish.DishID,
-            name: dish.DishName,
-            price: parseInt(dish.Price),
-            image: dish.ImageURL ? `${API_BASE_URL}/${dish.ImageURL}` : null,
-            description: dish.Description,
-            categoryId: category.CategoryID,
-          }));
-          allDishesFromApi = [...allDishesFromApi, ...dishes];
-        });
-        setAllDishes(allDishesFromApi);
-      } catch (error) {
-        console.error('Lỗi khi tải thực đơn:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMenuData();
-  }, []);
+    fetchMenu();
+  }, [fetchMenu]);
 
   const getFilteredDishes = () => {
-    if (selectedCategoryId === 0) {
-      return allDishes;
-    }
+    if (selectedCategoryId === 0) return allDishes;
     return allDishes.filter(dish => dish.categoryId === selectedCategoryId);
   };
 
@@ -132,29 +174,18 @@ const MenuScreen = ({ route, navigation }) => {
 
   const confirmAddToCart = () => {
     if (!selectedDish) return;
-
     setCart(currentCart => {
       const existingItemIndex = currentCart.findIndex(
         item => item.id === selectedDish.id && item.notes === notes,
       );
-
       if (existingItemIndex > -1) {
         const updatedCart = [...currentCart];
         updatedCart[existingItemIndex].quantity += quantity;
         return updatedCart;
       } else {
-        const newCartItem = {
-          id: selectedDish.id,
-          name: selectedDish.name,
-          price: selectedDish.price,
-          image: selectedDish.image,
-          quantity: quantity,
-          notes: notes,
-        };
-        return [...currentCart, newCartItem];
+        return [...currentCart, { ...selectedDish, quantity, notes }];
       }
     });
-
     setModalVisible(false);
   };
 

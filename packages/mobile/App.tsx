@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import AppNavigator from './src/navigation/AppNavigator';
 import { CartProvider } from './src/context/CartContext';
+import { NetworkProvider } from './src/context/NetworkContext';
 import { databaseService } from './src/services/DatabaseService';
 
 const App = () => {
@@ -18,9 +19,11 @@ const App = () => {
   }, []);
 
   return (
-    <CartProvider>
-      <AppNavigator />
-    </CartProvider>
+    <NetworkProvider>
+      <CartProvider>
+        <AppNavigator />
+      </CartProvider>
+    </NetworkProvider>
   );
 };
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
+import RNFS from 'react-native-fs';
 import { databaseService } from './DatabaseService';
 import { API_BASE_URL } from '../apiConfig';
 
@@ -26,21 +27,50 @@ class SyncService {
     console.log('Starting initial data sync...');
 
     try {
-      // Fetch all data in parallel
       const [tablesRes, menuRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/tables`),
         axios.get(`${API_BASE_URL}/api/menu`),
       ]);
 
       const menuData = menuRes.data;
-
       const categories = menuData.map(({ dishes, ...category }) => category);
-      const dishes = menuData.flatMap(category => category.dishes);
+      const dishesFromServer = menuData.flatMap(category => category.dishes);
 
-      // Save data to local DB
+      console.log('Starting image download process...');
+      const imageDirectory = `${RNFS.DocumentDirectoryPath}/dish_images`;
+      await RNFS.mkdir(imageDirectory);
+
+      const dishesWithLocalImages = await Promise.all(
+        dishesFromServer.map(async dish => {
+          if (!dish.ImageURL) {
+            return { ...dish, LocalImageURL: null };
+          }
+
+          const remoteUrl = `${API_BASE_URL}/${dish.ImageURL}`;
+          const localPath = `${imageDirectory}/${dish.DishID}.jpg`;
+
+          try {
+            const downloadResult = await RNFS.downloadFile({
+              fromUrl: remoteUrl,
+              toFile: localPath,
+            }).promise;
+
+            if (downloadResult.statusCode === 200) {
+              return { ...dish, LocalImageURL: `file://${localPath}` };
+            }
+          } catch (error) {
+            console.warn(
+              `Failed to download image for dish ${dish.DishID}:`,
+              error,
+            );
+          }
+          return { ...dish, LocalImageURL: null };
+        }),
+      );
+
       await databaseService.syncTables(tablesRes.data);
       await databaseService.syncCategories(categories);
-      await databaseService.syncDishes(dishes);
+      await databaseService.syncDishes(dishesWithLocalImages);
 
       console.log('Initial data sync completed successfully.');
     } catch (error) {
@@ -67,37 +97,31 @@ class SyncService {
         return;
       }
 
-      console.log(
-        `Found ${pendingActions.rows.length} pending actions to sync.`,
-      );
-
       for (let i = 0; i < pendingActions.rows.length; i++) {
         const action = pendingActions.rows.item(i);
         const payload = JSON.parse(action.Payload);
 
         try {
           if (action.ActionType === 'CREATE_ORDER') {
-            // The server expects a different structure, let's adapt it
             const apiPayload = {
+              clientOrderId: payload.clientOrderId,
               tableId: payload.tableId,
               userId: payload.userId,
               items: payload.items,
               totalAmount: payload.totalAmount,
+              subTotal: payload.subTotal,
+              vatAmount: payload.vatAmount,
             };
             const response = await axios.post(
               `${API_BASE_URL}/api/orders`,
               apiPayload,
             );
-            const { orderId, updatedTableStatus } = response.data;
+            const { orderId } = response.data;
 
-            // Update local data with server response
-            await databaseService.updateLocalOrderAfterSync(
-              payload.clientOrderId,
-              orderId,
-            );
-            await databaseService.updateTableStatus(
-              payload.tableId,
-              updatedTableStatus,
+            // Update the local order with the ServerOrderID and set SyncStatus to 'synced'
+            await databaseService.executeSql(
+              "UPDATE orders SET ServerOrderID = ?, SyncStatus = 'synced' WHERE ClientOrderID = ?;",
+              [orderId, payload.clientOrderId],
             );
           }
           // Mark action as successful
@@ -105,7 +129,6 @@ class SyncService {
             "UPDATE action_queue SET Status = 'success' WHERE ActionID = ?;",
             [action.ActionID],
           );
-          console.log(`ActionID ${action.ActionID} synced successfully.`);
         } catch (error) {
           console.error(`Failed to sync ActionID ${action.ActionID}:`, error);
           await databaseService.executeSql(

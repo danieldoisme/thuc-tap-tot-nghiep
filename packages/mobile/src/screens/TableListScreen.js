@@ -13,7 +13,8 @@ import { API_BASE_URL } from '../apiConfig';
 import io from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@react-native-vector-icons/ionicons';
-import { databaseService } from '../services/DatabaseService'; // Import DatabaseService
+import { databaseService } from '../services/DatabaseService';
+import { useNetwork } from '../context/NetworkContext';
 
 const socket = io(API_BASE_URL);
 
@@ -40,6 +41,7 @@ const TableIcon = ({ isOccupied }) => {
 const TableListScreen = ({ navigation, route }) => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { isConnected } = useNetwork();
 
   useEffect(() => {
     navigation.setOptions({
@@ -58,7 +60,7 @@ const TableListScreen = ({ navigation, route }) => {
   }, [navigation]);
 
   const fetchTables = useCallback(async () => {
-    // 1. Load from local DB first for instant UI
+    // Load from local DB for instant UI
     try {
       const [results] = await databaseService.executeSql(
         'SELECT * FROM tables ORDER BY CAST(SUBSTR(TableName, 5) AS INTEGER);',
@@ -79,7 +81,12 @@ const TableListScreen = ({ navigation, route }) => {
       setLoading(false);
     }
 
-    // 2. Then, fetch from network to get latest data
+    // If online, fetch from network to get latest data
+    if (!isConnected) {
+      console.log('Device is offline. Using local table data.');
+      return;
+    }
+
     try {
       const response = await axios.get(`${API_BASE_URL}/api/tables`);
       const formattedData = response.data.map(table => ({
@@ -95,7 +102,7 @@ const TableListScreen = ({ navigation, route }) => {
         error,
       );
     }
-  }, []);
+  }, [isConnected]);
 
   useFocusEffect(
     useCallback(() => {
