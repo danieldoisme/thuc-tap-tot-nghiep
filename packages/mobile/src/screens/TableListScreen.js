@@ -7,13 +7,13 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import io from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@react-native-vector-icons/ionicons';
+import { databaseService } from '../services/DatabaseService'; // Import DatabaseService
 
 const socket = io(API_BASE_URL);
 
@@ -58,7 +58,28 @@ const TableListScreen = ({ navigation, route }) => {
   }, [navigation]);
 
   const fetchTables = useCallback(async () => {
-    setLoading(true);
+    // 1. Load from local DB first for instant UI
+    try {
+      const [results] = await databaseService.executeSql(
+        'SELECT * FROM tables ORDER BY CAST(SUBSTR(TableName, 5) AS INTEGER);',
+      );
+      const localTables = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        const item = results.rows.item(i);
+        localTables.push({
+          id: item.TableID.toString(),
+          name: item.TableName,
+          status: item.Status,
+        });
+      }
+      setTables(localTables);
+    } catch (error) {
+      console.error('Failed to load tables from local DB:', error);
+    } finally {
+      setLoading(false);
+    }
+
+    // 2. Then, fetch from network to get latest data
     try {
       const response = await axios.get(`${API_BASE_URL}/api/tables`);
       const formattedData = response.data.map(table => ({
@@ -67,10 +88,12 @@ const TableListScreen = ({ navigation, route }) => {
         status: table.Status,
       }));
       setTables(formattedData);
+      await databaseService.syncTables(response.data);
     } catch (error) {
-      console.error('Lỗi khi tải danh sách bàn:', error);
-    } finally {
-      setLoading(false);
+      console.error(
+        'Lỗi khi tải danh sách bàn từ API, dùng dữ liệu cục bộ:',
+        error,
+      );
     }
   }, []);
 
@@ -81,12 +104,13 @@ const TableListScreen = ({ navigation, route }) => {
   );
 
   useEffect(() => {
-    const handleTableStatusUpdate = ({ tableId, status }) => {
+    const handleTableStatusUpdate = async ({ tableId, status }) => {
       setTables(currentTables =>
         currentTables.map(table =>
           table.id === tableId.toString() ? { ...table, status } : table,
         ),
       );
+      await databaseService.updateTableStatus(tableId, status);
     };
 
     socket.on('table_status_updated', handleTableStatusUpdate);

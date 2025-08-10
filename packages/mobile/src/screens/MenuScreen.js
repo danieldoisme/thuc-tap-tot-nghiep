@@ -19,6 +19,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
 import Icon from '@react-native-vector-icons/ionicons';
 import DishItem from '../components/DishItem';
+import databaseService from '../services/databaseService';
 import { useCart } from '../context/CartContext';
 
 const MenuScreen = ({ route, navigation }) => {

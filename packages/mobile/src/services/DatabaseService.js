@@ -160,6 +160,26 @@ class DatabaseService {
     });
     console.log(`Synced ${dishes.length} dishes.`);
   }
+
+  // --- HELPER METHODS ---
+
+  async updateTableStatus(tableId, status) {
+    await this.executeSql('UPDATE tables SET Status = ? WHERE TableID = ?;', [
+      status,
+      tableId,
+    ]);
+    console.log(`Updated status for TableID ${tableId} to ${status}`);
+  }
+
+  async updateLocalOrderAfterSync(clientOrderId, serverOrderId) {
+    await this.executeSql(
+      'UPDATE orders SET ServerOrderID = ?, Status = ? WHERE ClientOrderID = ?;',
+      [serverOrderId, 'synced', clientOrderId],
+    );
+    console.log(
+      `Synced local order ${clientOrderId} with ServerOrderID ${serverOrderId}`,
+    );
+  }
 }
 
 export const databaseService = new DatabaseService();
