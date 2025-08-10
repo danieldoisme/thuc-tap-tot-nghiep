@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API_BASE_URL } from '../apiConfig';
+import { syncService } from '../services/SyncService';
+import { databaseService } from '../services/DatabaseService';
 
 const LoginScreen = ({ navigation }) => {
   const [userCode, setUserCode] = useState('');
@@ -40,7 +42,15 @@ const LoginScreen = ({ navigation }) => {
       const userData = response.data.user;
 
       if (userData) {
+        await databaseService.executeSql(
+          'INSERT OR REPLACE INTO users (UserID, UserCode, FullName) VALUES (?, ?, ?);',
+          [userData.UserID, userData.UserCode, userData.FullName],
+        );
+        console.log('Người dùng đã được lưu vào cơ sở dữ liệu cục bộ.');
+
         navigation.replace('TableList', { user: userData });
+
+        syncService.syncInitialData();
       } else {
         Alert.alert(
           'Đăng nhập thất bại',
