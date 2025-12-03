@@ -1,1 +1,1 @@
-# Thực tập tốt nghiệp
+# thuc-tap-tot-nghiep
